@@ -11,7 +11,7 @@ var configs = [
         key_name: 'dbconfig',
         type: "Config File",
         isJSON: true,
-        assertHas: ['data'],
+        assertHas: ['authentication', 'data'],
         file: "./db-connection.json"
     },
     {
