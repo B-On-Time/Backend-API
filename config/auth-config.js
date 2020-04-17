@@ -11,8 +11,8 @@ var configs = [
         key_name: 'dbconfig',
         type: "Config File",
         isJSON: true,
-        assertHas: ['authentication', 'data'],
-        file: "./db-connection.json"
+        assertHas: ['data'],
+        file: path.join(__dirname, "db-connection.json")
     },
     {
       human_name: "RSA 4096 Private Key - JWT",
@@ -20,7 +20,7 @@ var configs = [
       type: "Private Key",
       isJSON: false,
       assertHas: [],
-      file: "./keys/jwt-rsa.private"
+      file: path.join(__dirname, "keys/jwt-rsa.private")
     },
     {
       human_name: "RSA 4096 Public Key - JWT",
@@ -28,7 +28,7 @@ var configs = [
       type: "Public Key",
       isJSON: false,
       assertHas: [],
-      file: "./keys/jwt-rsa.public"
+      file: path.join(__dirname, "keys/jwt-rsa.public")
     }
 
 ];
@@ -47,7 +47,7 @@ configs.forEach((cfg)=>{
 
 function getConfigItem(configObj){
     log.info("Load Config: " + configObj.human_name);
-    var fullpath = path.join(__dirname, configObj.file);
+    var fullpath = configObj.file;
     if( fs.existsSync(fullpath) ){
         // File Exists
         try {

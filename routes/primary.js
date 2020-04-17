@@ -123,7 +123,7 @@ router.post('/clock/in', function (req, res) {
     // get timer and result builder
     var {timer, result} = initializeRoute(req);
 
-    log.info("Searching...")
+    log.info("User Clocks IN")
     console.log(req.params)
 
     // get user id
@@ -132,6 +132,46 @@ router.post('/clock/in', function (req, res) {
     // get json body
     var body = req.body;
 
+    // TODO: Validation
+
+    // TODO: Permissions Checking
+
+    // Assumes The Following Exist In Body
+    // userId
+    // eventDate
+    // entryTime
+    // punchType
+    // notes
+
+    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+    db.clock.in(pool, userID, values, completedQuery, failedQuery);
+
+    function completedQuery(qres){
+        var packed = {
+            punch_id: qres.rows[0].punch_event_id,
+        };
+        result.setStatus(200);
+        result.setPayload(packed);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+
+    function failedQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
 });
 
 // Clock OUT
@@ -149,6 +189,46 @@ router.post('/clock/out', function (req, res) {
     // get json body
     var body = req.body;
 
+    // TODO: Validation
+
+    // TODO: Permissions Checking
+
+    // Assumes The Following Exist In Body
+    // userId
+    // eventDate
+    // entryTime
+    // punchType
+    // notes
+
+    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+    db.clock.out(pool, userID, values, completedQuery, failedQuery);
+
+    function completedQuery(qres){
+        var packed = {
+            punch_id: qres.rows[0].punch_event_id,
+        };
+        result.setStatus(200);
+        result.setPayload(packed);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+
+    function failedQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
 });
 
 // Get all timesheets
