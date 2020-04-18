@@ -115,6 +115,12 @@ function initializeRoute(req){
     }
 }
 
+function pad(n, width, z) {
+    z = z || '0';
+    n = n + '';
+    return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+}
+
 // Most Basic Behavior
 
 // Clock IN
@@ -143,21 +149,59 @@ router.post('/clock/in', function (req, res) {
     // punchType
     // notes
 
-    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+    // Check if User Currently Clocked In
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
-    db.clock.in(pool, userID, values, completedQuery, failedQuery);
+    function completedStatusQuery(qres){
+        var statusOK = false;
+        if(qres.rowCount == 0){
+            statusOK = true;
+        }else if(qres.rows[0].current_status != 'Clocked Out' ){
+            statusOK = false;
+        }else{
+            statusOK = true;
+        }
+        
+        if(statusOK){
+            // Perform Clock In
+            var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
 
-    function completedQuery(qres){
-        var packed = {
-            punch_id: qres.rows[0].punch_event_id,
-        };
-        result.setStatus(200);
-        result.setPayload(packed);
-        res.status(result.getStatus()).type('application/json').send(result.getPayload());
-        timer.endTimer(result);
+            db.clock.in(pool, userID, values, completedQuery, failedQuery);
+
+            function completedQuery(qres){
+                var packed = {
+                    punch_id: qres.rows[0].punch_event_id,
+                };
+                result.setStatus(200);
+                result.setPayload(packed);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+
+            function failedQuery(failure){
+                console.log("Failure Called")
+                if(failure.error){
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    console.log(failure.result)
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+            }
+        }else{
+            result.setStatus(403);
+            result.addError("Cannot Clock In, Already Clocked In");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result); 
+        }
     }
 
-    function failedQuery(failure){
+    function failedStatusQuery(failure){
         console.log("Failure Called")
         if(failure.error){
             result.setStatus(500);
@@ -172,6 +216,8 @@ router.post('/clock/in', function (req, res) {
             timer.endTimer(result);
         }
     }
+
+    
 });
 
 // Clock OUT
@@ -200,13 +246,327 @@ router.post('/clock/out', function (req, res) {
     // punchType
     // notes
 
-    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+    // Check if User Currently Clocked In
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
-    db.clock.out(pool, userID, values, completedQuery, failedQuery);
+    function completedStatusQuery(qres){
+        var statusOK = 'OK';
+        if(qres.rowCount == 0){
+            statusOK = 'Cannot Clock Out, Not Clocked In';
+        }else if(qres.rows[0].current_status == 'On Break'){
+            statusOK = 'Cannot Clock Out, Currently On Break. End Break, Then Clock Out';
+        }else if(qres.rows[0].current_status == 'Clocked Out'){
+            statusOK = 'Cannot Clock Out, Already Clocked Out';
+        }else{
+            statusOK = 'OK';
+        }
+        
+        if(statusOK == 'OK'){
+            // Perform Clock In
+            var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+            db.clock.out(pool, userID, values, completedQuery, failedQuery);
+
+            function completedQuery(qres){
+                var packed = {
+                    punch_id: qres.rows[0].punch_event_id,
+                };
+                result.setStatus(200);
+                result.setPayload(packed);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+
+            function failedQuery(failure){
+                console.log("Failure Called")
+                if(failure.error){
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    console.log(failure.result)
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+            }
+        }else{
+            result.setStatus(403);
+            result.addError(statusOK);
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result); 
+        }
+    }
+
+    function failedStatusQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
+
+// Break IN
+router.post('/break/start', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    log.info("User Clocks IN")
+    console.log(req.params)
+
+    // get user id
+    var userID = req.user.id;
+
+    // get json body
+    var body = req.body;
+
+    // TODO: Validation
+
+    // TODO: Permissions Checking
+
+    // Assumes The Following Exist In Body
+    // userId
+    // eventDate
+    // entryTime
+    // punchType
+    // notes
+
+    // Check if User Currently Clocked In
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+
+    function completedStatusQuery(qres){
+        var statusOK = 'OK';
+        if(qres.rowCount == 0){
+            statusOK = 'Cannot Start Break, Not Clocked In';
+        }else if(qres.rows[0].current_status == 'On Break'){
+            statusOK = 'Cannot Start Break, Currently On Break. End Break, Then Start Another';
+        }else if(qres.rows[0].current_status == 'Clocked Out'){
+            statusOK = 'Cannot Start Break, While Clocked Out';
+        }else{
+            statusOK = 'OK';
+        }
+        
+        if(statusOK == 'OK'){
+            // Perform Clock In
+            var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+            db.break.in(pool, userID, values, completedQuery, failedQuery);
+
+            function completedQuery(qres){
+                var packed = {
+                    punch_id: qres.rows[0].punch_event_id,
+                };
+                result.setStatus(200);
+                result.setPayload(packed);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+
+            function failedQuery(failure){
+                console.log("Failure Called")
+                if(failure.error){
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    console.log(failure.result)
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+            }
+        }else{
+            result.setStatus(403);
+            result.addError(statusOK);
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result); 
+        }
+    }
+
+    function failedStatusQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
+
+// Break OUT
+router.post('/break/end', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    log.info("Searching...")
+    console.log(req.params)
+
+    // get user id
+    var userID = req.user.id;
+
+    // get json body
+    var body = req.body;
+
+    // TODO: Validation
+
+    // TODO: Permissions Checking
+
+    // Assumes The Following Exist In Body
+    // userId
+    // eventDate
+    // entryTime
+    // punchType
+    // notes
+
+    // Check if User Currently Clocked In
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+
+    function completedStatusQuery(qres){
+        var statusOK = 'OK';
+        if(qres.rowCount == 0){
+            statusOK = 'Cannot End Break, Not Clocked In';
+        }else if(qres.rows[0].current_status == 'Back From Break'){
+            statusOK = 'Cannot End Break, Already Back From Break. Start A New Break, Then End It.';
+        }else if(qres.rows[0].current_status == 'Clocked Out'){
+            statusOK = 'Cannot End Break, While Clocked Out';
+        }else{
+            statusOK = 'OK';
+        }
+        
+        if(statusOK == 'OK'){
+            // Perform Clock In
+            var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+            db.break.out(pool, userID, values, completedQuery, failedQuery);
+
+            function completedQuery(qres){
+                var packed = {
+                    punch_id: qres.rows[0].punch_event_id,
+                };
+                result.setStatus(200);
+                result.setPayload(packed);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+
+            function failedQuery(failure){
+                console.log("Failure Called")
+                if(failure.error){
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    console.log(failure.result)
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+            }
+        }else{
+            result.setStatus(403);
+            result.addError(statusOK);
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result); 
+        }
+    }
+
+    function failedStatusQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
+
+
+// Check Clock Status
+router.post('/clock/status', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    log.info("Searching...")
+    console.log(req.params)
+
+    // get user id
+    var userID = req.user.id;
+
+    // get json body
+    var body = req.body;
+
+    // TODO: Validation
+
+    // TODO: Permissions Checking
+
+    // Assumes The Following Exist In Body
+    // userId - User you seek to lookup the staus of, OPTIONAL, if NULL then assume user is self
+    // seekTimestamp FORMAT: 'YYYY-MM-DD HH:MM:SS' OR NULL, NULL will assume that status is for current time
+
+    var userId;
+    if(_.has(body, 'userId')){
+        userId = body.userId;
+    }else{
+        userId = userID;
+    }
+
+    var pgTimeStamp;
+    if(_.has(body, 'seekTimestamp')){
+        pgTimeStamp = body.seekTimestamp;
+    }else{
+        var d = new Date();
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }
+
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedQuery, failedQuery);
 
     function completedQuery(qres){
+        var recs = [];
+        qres.rows.forEach(r => {
+            recs.push({
+                punchID: r.punch_id,
+                punchType: r.punchType,
+                punchDay: r.clock_day,
+                punchEventID: r.punch_event_id,
+                punchEventTimestamp: r.clock_time,
+                currentStatus: r.current_status,
+                currentTimer: r.for_interval
+            });
+        });
         var packed = {
-            punch_id: qres.rows[0].punch_event_id,
+            records: recs
         };
         result.setStatus(200);
         result.setPayload(packed);
@@ -230,6 +590,8 @@ router.post('/clock/out', function (req, res) {
         }
     }
 });
+
+
 
 // Get all timesheets
 router.get('/timesheets', function (req, res) {

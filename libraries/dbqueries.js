@@ -58,6 +58,34 @@ const clock = {
         };
         performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
     },
+    status(pool, userID, lookup_user_id, pg_timestamp, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET LOCAL loc.seek_time = \'' + pg_timestamp + '\'; SET LOCAL loc.seek_user = \'' + lookup_user_id + '\';SET ROLE \'' + userID + '\'',
+            text: 'SELECT * FROM check_status'
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
+};
+
+const clockBreak = {
+    start(pool, userID, values, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET ROLE \'' + userID + '\'',
+            text: 'SELECT break_in as punch_event_id FROM break_in($1::uuid, $2::date, $3::time, $4::punch_types, $5::text)',
+            //lookup_user_id, lookup_event_date, entry_time, lookup_punch_type, passed_notes
+            values: values
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
+    end(pool, userID, values, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET ROLE \'' + userID + '\'',
+            text: 'SELECT break_out as punch_event_id FROM break_out($1::uuid, $2::date, $3::time, $4::punch_types, $5::text)',
+            //lookup_user_id, lookup_event_date, entry_time, lookup_punch_type, passed_notes
+            values: values
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
 }
 
 
@@ -120,6 +148,8 @@ function performQueryAsRole_withValues(pool, query, successCallback, failureCall
         })
     });
 }
+
+
 function performQueryAsRole_noValues(pool, query, successCallback, failureCallback){
     pool.connect((err, client, success, failure) => {
         const shouldAbort = err => {
@@ -278,5 +308,6 @@ module.exports = {
     select,
     insert,
     auth,
-    clock
+    clock,
+    clockBreak,
 };
