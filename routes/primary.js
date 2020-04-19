@@ -163,7 +163,9 @@ router.post('/clock/in', function (req, res) {
     // notes
 
     // Check if User Currently Clocked In
-    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+    db.clock.in(pool, userID, values, completedQuery, failedQuery);
 
     function completedStatusQuery(qres){
         var statusOK = false;
@@ -260,7 +262,9 @@ router.post('/clock/out', function (req, res) {
     // notes
 
     // Check if User Currently Clocked In
-    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+    db.clock.out(pool, userID, values, completedQuery, failedQuery);
 
     function completedStatusQuery(qres){
         var statusOK = 'OK';
@@ -357,7 +361,9 @@ router.post('/break/start', function (req, res) {
     // notes
 
     // Check if User Currently Clocked In
-    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+    db.clockBreak.start(pool, userID, values, completedQuery, failedQuery);
 
     function completedStatusQuery(qres){
         var statusOK = 'OK';
@@ -454,7 +460,9 @@ router.post('/break/end', function (req, res) {
     // notes
 
     // Check if User Currently Clocked In
-    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+
+    db.clockBreak.end(pool, userID, values, completedQuery, failedQuery);
 
     function completedStatusQuery(qres){
         var statusOK = 'OK';
