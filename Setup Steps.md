@@ -23,13 +23,7 @@ CREATE EXTENSION "uuid-ossp" SCHEMA public;
 -- Setup Rest API users
 
 -- Create Role Group
-CREATE ROLE "bontime_users" WITH
-  NOLOGIN
-  NOSUPERUSER
-  INHERIT
-  NOCREATEDB
-  NOCREATEROLE
-  NOREPLICATION;
+CREATE ROLE "bontime_users" WITH NOLOGIN NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
   
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT ALL ON TABLES TO "bontime_users";
@@ -624,7 +618,7 @@ CREATE TABLE public.punches
 	punch_type punch_types NOT NULL,
 	timesheet_id uuid,
 	event_date double precision,
-	uuser_id uuid NOT NULL,
+	user_id uuid NOT NULL,
     PRIMARY KEY (id)
 );
 
@@ -771,9 +765,6 @@ GRANT ALL ON TABLE public.teams TO bontime_users;
 GRANT ALL ON TABLE public.timesheets TO bontime_users;
 GRANT ALL ON TABLE public.users TO bontime_users;
 
--- JANK THIS SHIT UP
-ALTER TABLE public.punches ADD COLUMN user_id uuid NOT NULL;
-
 ALTER TABLE public.punches
     ADD CONSTRAINT user_id_must_be_valid_user FOREIGN KEY (user_id)
     REFERENCES public.users (id) MATCH SIMPLE
@@ -785,7 +776,7 @@ CREATE INDEX fki_punches_user_id_must_be_valid_user
 -- PROCEDURE: Generate Password For Administrator
 
 -- Add Core Functions
-CREATE OR REPLACE FUNCTION public.clock_in(lookup_user_id uuid, lookup_event_date date, lookup_punch_type punch_types, passed_notes text)
+CREATE OR REPLACE FUNCTION public.clock_in(lookup_user_id uuid, lookup_event_date date, entry_time time, lookup_punch_type punch_types, passed_notes text)
     RETURNS uuid
     LANGUAGE 'plpgsql'
     COST 100
@@ -804,12 +795,12 @@ BEGIN
 	-- Check if Punch Exists
 	IF existing_punch.id IS NOT NULL THEN
 		-- Use Existing Punch
-		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, existing_punch.id, 'IN'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (now())))) RETURNING id INTO res;
+		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, existing_punch.id, 'IN'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (lookup_event_date + entry_time)))) RETURNING id INTO res;
 	ELSE
 		-- Create New Punches Row
 		INSERT INTO punches(created_by, punch_type, event_date, user_id) VALUES(cur_user, lookup_punch_type, event_date_epoch, lookup_user_id) RETURNING id INTO new_punch;
 		-- INSERT Punch Event Using The New Punches Item
-		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, new_punch, 'IN'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (now())))) RETURNING id INTO res;
+		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, new_punch, 'IN'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (lookup_event_date + entry_time)))) RETURNING id INTO res;
 	END IF;
 																					
 	RETURN res;
@@ -827,13 +818,13 @@ EXCEPTION
 END
 $BODY$;
 
-ALTER FUNCTION public.clock_in(uuid, date, punch_types, text)
+ALTER FUNCTION public.clock_in(uuid, date, time, punch_types, text)
     OWNER TO "bontime_rest_api_data_user";
 
-GRANT EXECUTE ON FUNCTION public.clock_in(uuid, date, punch_types, text) TO "bontime_users";
+GRANT EXECUTE ON FUNCTION public.clock_in(uuid, date, time, punch_types, text) TO "bontime_users";
 
 
-CREATE OR REPLACE FUNCTION public.clock_out(lookup_user_id uuid, lookup_event_date date, lookup_punch_type punch_types, passed_notes text)
+CREATE OR REPLACE FUNCTION public.clock_out(lookup_user_id uuid, lookup_event_date date, entry_time time, lookup_punch_type punch_types, passed_notes text)
     RETURNS uuid
     LANGUAGE 'plpgsql'
     COST 100
@@ -852,12 +843,12 @@ BEGIN
 	-- Check if Punch Exists
 	IF existing_punch.id IS NOT NULL THEN
 		-- Use Existing Punch
-		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, existing_punch.id, 'OUT'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (now())))) RETURNING id INTO res;
+		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, existing_punch.id, 'OUT'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (lookup_event_date + entry_time)))) RETURNING id INTO res;
 	ELSE
 		-- Create New Punches Row
 		INSERT INTO punches(created_by, punch_type, event_date, user_id) VALUES(cur_user, lookup_punch_type, event_date_epoch, lookup_user_id) RETURNING id INTO new_punch;
 		-- INSERT Punch Event Using The New Punches Item
-		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, new_punch, 'OUT'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (now())))) RETURNING id INTO res;
+		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, new_punch, 'OUT'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (lookup_event_date + entry_time)))) RETURNING id INTO res;
 	END IF;
 																					
 	RETURN res;
@@ -875,13 +866,13 @@ EXCEPTION
 END
 $BODY$;
 
-ALTER FUNCTION public.clock_out(uuid, date, punch_types, text)
+ALTER FUNCTION public.clock_out(uuid, date, time, punch_types, text)
     OWNER TO "bontime_rest_api_data_user";
 
-GRANT EXECUTE ON FUNCTION public.clock_out(uuid, date, punch_types, text) TO "bontime_users";
+GRANT EXECUTE ON FUNCTION public.clock_out(uuid, date, time, punch_types, text) TO "bontime_users";
 
 
-CREATE OR REPLACE FUNCTION public.break_in(lookup_user_id uuid, lookup_event_date date, lookup_punch_type punch_types, passed_notes text)
+CREATE OR REPLACE FUNCTION public.break_in(lookup_user_id uuid, lookup_event_date date, entry_time time, lookup_punch_type punch_types, passed_notes text)
     RETURNS uuid
     LANGUAGE 'plpgsql'
     COST 100
@@ -900,12 +891,12 @@ BEGIN
 	-- Check if Punch Exists
 	IF existing_punch.id IS NOT NULL THEN
 		-- Use Existing Punch
-		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, existing_punch.id, 'BIN'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (now())))) RETURNING id INTO res;
+		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, existing_punch.id, 'BIN'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (lookup_event_date + entry_time)))) RETURNING id INTO res;
 	ELSE
 		-- Create New Punches Row
 		INSERT INTO punches(created_by, punch_type, event_date, user_id) VALUES(cur_user, lookup_punch_type, event_date_epoch, lookup_user_id) RETURNING id INTO new_punch;
 		-- INSERT Punch Event Using The New Punches Item
-		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, new_punch, 'BIN'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (now())))) RETURNING id INTO res;
+		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, new_punch, 'BIN'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (lookup_event_date + entry_time)))) RETURNING id INTO res;
 	END IF;
 																					
 	RETURN res;
@@ -923,13 +914,13 @@ EXCEPTION
 END
 $BODY$;
 
-ALTER FUNCTION public.break_in(uuid, date, punch_types, text)
+ALTER FUNCTION public.break_in(uuid, date, time, punch_types, text)
     OWNER TO "bontime_rest_api_data_user";
 
-GRANT EXECUTE ON FUNCTION public.break_in(uuid, date, punch_types, text) TO "bontime_users";
+GRANT EXECUTE ON FUNCTION public.break_in(uuid, date, time, punch_types, text) TO "bontime_users";
 
 
-CREATE OR REPLACE FUNCTION public.break_out(lookup_user_id uuid, lookup_event_date date, lookup_punch_type punch_types, passed_notes text)
+CREATE OR REPLACE FUNCTION public.break_out(lookup_user_id uuid, lookup_event_date date, entry_time time, lookup_punch_type punch_types, passed_notes text)
     RETURNS uuid
     LANGUAGE 'plpgsql'
     COST 100
@@ -948,12 +939,12 @@ BEGIN
 	-- Check if Punch Exists
 	IF existing_punch.id IS NOT NULL THEN
 		-- Use Existing Punch
-		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, existing_punch.id, 'BOUT'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (now())))) RETURNING id INTO res;
+		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, existing_punch.id, 'BOUT'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (lookup_event_date + entry_time)))) RETURNING id INTO res;
 	ELSE
 		-- Create New Punches Row
 		INSERT INTO punches(created_by, punch_type, event_date, user_id) VALUES(cur_user, lookup_punch_type, event_date_epoch, lookup_user_id) RETURNING id INTO new_punch;
 		-- INSERT Punch Event Using The New Punches Item
-		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, new_punch, 'BOUT'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (now())))) RETURNING id INTO res;
+		INSERT INTO punch_events(created_by, punch_id, "type", notes, entry) VALUES(cur_user, new_punch, 'BOUT'::punch_event_type, passed_notes, date_part('epoch'::text, timezone('utc'::text, (lookup_event_date + entry_time)))) RETURNING id INTO res;
 	END IF;
 																					
 	RETURN res;
@@ -971,10 +962,216 @@ EXCEPTION
 END
 $BODY$;
 
-ALTER FUNCTION public.break_out(uuid, date, punch_types, text)
+ALTER FUNCTION public.break_out(uuid, date, time, punch_types, text)
     OWNER TO "bontime_rest_api_data_user";
 
-GRANT EXECUTE ON FUNCTION public.break_out(uuid, date, punch_types, text) TO "bontime_users";
+GRANT EXECUTE ON FUNCTION public.break_out(uuid, date, time, punch_types, text) TO "bontime_users";
+
+-- Check Status of Employee
+CREATE OR REPLACE VIEW public.check_status AS
+WITH seek as (
+	SELECT
+		-- TZ OFFSET
+		-- ( to_timestamp(date_part('epoch'::text, timezone('utc'::text, current_setting('loc.seek_time')::TIMESTAMP )::TIMESTAMP)) at time zone 'utc')::TIMESTAMP as seek_tstamp,
+		-- ( to_timestamp(date_part('epoch'::text, timezone('utc'::text, current_setting('loc.seek_time')::TIMESTAMP )::TIMESTAMP)) at time zone 'utc')::DATE as seek_date,
+		-- date_part('epoch'::text, timezone('utc'::text, current_setting('loc.seek_time')::TIMESTAMP )::TIMESTAMP) as seek_epoch,
+		( to_timestamp(date_part('epoch'::text, current_setting('loc.seek_time')::TIMESTAMP)) at time zone 'utc')::TIMESTAMP as seek_tstamp,
+		( to_timestamp(date_part('epoch'::text, current_setting('loc.seek_time')::TIMESTAMP)) at time zone 'utc')::DATE as seek_date,
+		date_part('epoch'::text, current_setting('loc.seek_time')::TIMESTAMP) as seek_epoch
+), selected_punch as (
+	SELECT 
+		id, 
+		punch_type, 
+		timesheet_id,
+		event_date,
+		(to_timestamp(event_date) at time zone 'utc')::DATE as clock_day
+	FROM public.punches
+	WHERE (SELECT seek_date FROM seek) = (to_timestamp(event_date) at time zone 'utc')::DATE
+	AND user_id = CURRENT_SETTING('loc.seek_user')::UUID
+)
+SELECT 
+	p.id as punch_id, 
+	p.punch_type, 
+	p.timesheet_id, 
+	p.event_date,
+	p.clock_day,
+	pe.id as punch_event_id,
+	--pe.entry,
+	(to_timestamp(entry) at time zone 'utc') as clock_time,
+	pe.type,
+	((SELECT seek_tstamp FROM seek) - to_timestamp(entry) at time zone 'utc')::INTERVAL as for_interval,
+	CASE WHEN pe.type = 'BIN' THEN 'On Break' WHEN pe.type = 'BOUT' THEN 'Back From Break' WHEN pe.type = 'IN' THEN 'Clocked In' ELSE 'Clocked Out' END as current_status
+FROM selected_punch as p
+LEFT JOIN public.punch_events as pe ON pe.punch_id = p.id
+WHERE (SELECT seek_tstamp FROM seek) >= (to_timestamp(entry) at time zone 'utc');
+
+ALTER TABLE public.check_status OWNER TO "bontime_rest_api_data_user";
+
+GRANT ALL ON TABLE public.check_status TO "bontime_users";
+
+-- Add Kisok Pin Code To Auth Table
+ALTER TABLE public.auth ADD COLUMN kiosk_pin bigint DEFAULT NULL;
+ALTER TABLE public.auth ADD CONSTRAINT kiosk_pin_must_be_unique UNIQUE (kiosk_pin);
+
+-- Function To Create Unique Kiosk PIN Codes
+-- 8 digit pin codes
+CREATE OR REPLACE FUNCTION public.generate_kiosk_pin()
+    RETURNS bigint
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE 
+AS $BODY$
+DECLARE
+	pin_good boolean;
+	pin bigint;
+	found_id uuid;
+	loop_count int;
+BEGIN
+	pin_good := false;
+	loop_count := 0;
+	WHILE NOT(pin_good) AND loop_count < 25000 LOOP
+	    pin := floor(random() * 89999999 + 10000000)::bigint;
+	    SELECT id INTO found_id FROM public.auth WHERE kiosk_pin = pin;
+	    IF found_id is null THEN
+			pin_good := true;
+	    END IF;
+		loop_count := loop_count + 1;
+	END LOOP;
+																					
+	RETURN pin;
+
+EXCEPTION
+	WHEN data_exception THEN
+		RAISE EXCEPTION '[GENERATE KIOSK PIN FAILED] - UDF ERROR [DATA EXCEPTION] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::bigint;
+	WHEN unique_violation THEN
+		RAISE EXCEPTION '[GENERATE KIOSK PIN FAILED] - UDF ERROR [UNIQUE] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::bigint;
+	WHEN OTHERS THEN
+		RAISE EXCEPTION '[GENERATE KIOSK PIN FAILED] - UDF ERROR [OTHER] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::bigint;
+END
+$BODY$;
+
+ALTER FUNCTION public.generate_kiosk_pin() OWNER TO "bontime_rest_api_data_user";
+GRANT EXECUTE ON FUNCTION public.generate_kiosk_pin() TO "bontime_users";
+
+-- Function To Assign Kiosk Pin Codes
+CREATE OR REPLACE FUNCTION public.upsert_kiosk_pin(lookup_user_id uuid)
+    RETURNS bigint
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE 
+AS $BODY$
+DECLARE
+	pin bigint;
+	auth_id uuid;
+BEGIN
+	pin :=  (SELECT public.generate_kiosk_pin());
+	SELECT id INTO auth_id FROM public.auth WHERE auth.user_id = lookup_user_id;
+	
+	IF auth_id is null THEN
+		INSERT INTO public.auth(created_by, user_id, expires, kiosk_pin) 
+		VALUES ((SELECT current_user)::UUID, lookup_user_id, date_part('epoch'::text, timezone('utc'::text, (now()))), pin);
+	ELSE
+		UPDATE public.auth SET kiosk_pin = pin WHERE user_id = lookup_user_id;
+	END IF;
+																					
+	RETURN pin;
+
+EXCEPTION
+	WHEN data_exception THEN
+		RAISE EXCEPTION '[UPSERT KIOSK PIN FAILED] - UDF ERROR [DATA EXCEPTION] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::bigint;
+	WHEN unique_violation THEN
+		RAISE EXCEPTION '[UPSERT KIOSK PIN FAILED] - UDF ERROR [UNIQUE] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::bigint;
+	WHEN OTHERS THEN
+		RAISE EXCEPTION '[UPSERT KIOSK PIN FAILED] - UDF ERROR [OTHER] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::bigint;
+END
+$BODY$;
+
+ALTER FUNCTION public.upsert_kiosk_pin(lookup_user_id uuid) OWNER TO "bontime_rest_api_data_user";
+GRANT EXECUTE ON FUNCTION public.upsert_kiosk_pin(lookup_user_id uuid) TO "bontime_users";
+
+-- Function To Create User
+CREATE TYPE create_user_type AS (user_id uuid, first_name text, middle_name text, last_name text, email text, pin bigint, email_verification uuid );
+CREATE OR REPLACE FUNCTION public.create_user(fname text, mname text, lname text, email text, team uuid[], perm uuid, hash text)
+    RETURNS create_user_type
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE 
+AS $BODY$
+DECLARE
+	pin bigint;
+	uid uuid;
+	res record;
+	email_verification uuid;
+BEGIN
+	INSERT INTO public.users(created_by, teams, permset, email, first_name, middle_name, last_name) VALUES ((SELECT current_user)::UUID, team, perm, email, fname, mname, lname) RETURNING id INTO uid;
+	
+	INSERT INTO public.auth(created_by, user_id, expires, pass)VALUES ( (SELECT current_user)::UUID, uid, date_part('epoch'::text, timezone('utc'::text, (now() + interval '1 years'))), hash);
+	
+	SELECT upsert_kiosk_pin into pin FROM public.upsert_kiosk_pin(uid);
+	
+	INSERT INTO public.email_verification(user_id, expires) VALUES (uid, date_part('epoch'::text, timezone('utc'::text, (now() + interval '3 days')))) RETURNING id INTO email_verification;
+	
+	SELECT usr.id as user_id, usr.first_name, usr.middle_name, usr.last_name, usr.email, pin, email_verification FROM public.users as usr WHERE usr.id = uid INTO res;
+	
+	RETURN res;
+
+EXCEPTION
+	WHEN data_exception THEN
+		RAISE EXCEPTION '[CREATE USER FAILED] - UDF ERROR [DATA EXCEPTION] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::UUID as user_id, NULL::TEXT as first_name, NULL::TEXT as middle_name, NULL::TEXT as last_name, NULL::TEXT as email, NULL::BIGINT as pin, NULL::UUID as email_verification;
+	WHEN unique_violation THEN
+		RAISE EXCEPTION '[CREATE USER FAILED] - UDF ERROR [UNIQUE] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::UUID as user_id, NULL::TEXT as first_name, NULL::TEXT as middle_name, NULL::TEXT as last_name, NULL::TEXT as email, NULL::BIGINT as pin, NULL::UUID as email_verification;	
+	WHEN OTHERS THEN	
+		RAISE EXCEPTION '[CREATE USER FAILED] - UDF ERROR [OTHER] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN NULL::UUID as user_id, NULL::TEXT as first_name, NULL::TEXT as middle_name, NULL::TEXT as last_name, NULL::TEXT as email, NULL::BIGINT as pin, NULL::UUID as email_verification;
+END
+$BODY$;
+
+ALTER FUNCTION public.create_user(fname text, mname text, lname text, email text, team uuid[], perm uuid, hash text) OWNER TO "bontime_rest_api_data_user";
+GRANT EXECUTE ON FUNCTION public.create_user(fname text, mname text, lname text, email text, team uuid[], perm uuid, hash text) TO "bontime_users";
+
+-- Function To Quickly Verify Email
+CREATE OR REPLACE FUNCTION public.verify_email(verification_id uuid)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE 
+AS $BODY$
+DECLARE
+	uid uuid;
+BEGIN
+	UPDATE public.email_verification SET verified = true WHERE id = verification_id AND expires > extract(epoch from now() at time zone 'utc') RETURNING user_id INTO uid;
+	
+	IF uid is null THEN
+		RETURN false;
+	ELSE
+		RETURN true;
+	END IF;
+
+EXCEPTION
+	WHEN data_exception THEN
+		RAISE EXCEPTION '[EMAIL VERIFICATION FAILED] - UDF ERROR [DATA EXCEPTION] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN true;
+	WHEN unique_violation THEN
+		RAISE EXCEPTION '[EMAIL VERIFICATION FAILED] - UDF ERROR [UNIQUE] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+	 	RETURN true;
+	WHEN OTHERS THEN	
+		RAISE EXCEPTION '[EMAIL VERIFICATION FAILED] - UDF ERROR [OTHER] - SQLSTATE: %, SQLERRM: %',SQLSTATE,SQLERRM;
+		RETURN true;
+END
+$BODY$;
+
+ALTER FUNCTION public.verify_email(verification_id uuid) OWNER TO "bontime_rest_api_data_user";
+GRANT EXECUTE ON FUNCTION public.verify_email(verification_id uuid) TO "bontime_users";
+
+INSERT INTO public.auth(created_by, created_on, user_id, expires, pass) VALUES ('70c505eb-6671-47e6-a8a7-9d7d7fccf2b6', extract(epoch from now() at time zone 'utc'), '70c505eb-6671-47e6-a8a7-9d7d7fccf2b6', extract(epoch from (now() + interval '5 years') at time zone 'utc'), '$2a$10$90WTJvA0P5e.y55KVMtp9ushL/e8WzDq78mIpUhIRoqsTFNd5zIbm');
 ```
 
 Explore The Database, Its Up And Running
