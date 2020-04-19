@@ -819,15 +819,202 @@ router.post('/user', function (req, res) {
         }
     });
 });
+
 // put /user/:id - Update User - Updates In Place User
+router.put('/user/:id', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    // get user id
+    var userID = req.user.id;
+
+    // get json body
+    var body = req.body;
+
+    // Get id to update
+    var userId = req.params.id
+
+    // TODO: Validation
+    
+    // TODO: Check For Unique On Email Entry
+
+    // TODO: Permissions Checking
+
+    // The Following Elements Are Required For User Creation
+    // firstName - text
+    // middleName - text
+    // lastName - text
+    // email - text
+    // permissions - OPTIONAL: UUID of permission set, if null defaults to standard employee
+
+    var permID;
+    if(_.has(body, 'permissions')){
+        permID = body.permissions;
+    }else{
+        permID = 'c779a171-c434-4900-9c1c-3ea48e14368c';
+    }
+    
+    // TODO Validate Required Fields
+
+    var values = [permID, body.email, body.firstName, body.middleName, body.lastName, userId];
+
+    db.user.edit(pool, userID, values, successCallback, failureCallback);
+
+    function successCallback(qres){
+        // Respond With OK And 200
+        result.setStatus(204);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+
+    function failureCallback(failure){
+        console.log("DB Query Failed")
+        if(failure.error){
+            console.log(failure.error.name);
+            //console.log(failure.error.message);
+            if(failure.error.constraint == 'users_email_key'){
+                result.setStatus(403);
+                result.addError("User Already Exists");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+            
+        }else{
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
 
 // get /user/:id - Get Info On Single User
+router.get('/user/:id', function (req, res) {
 
-// get /user - Info About all users
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    log.info("Searching...")
+    console.log(req.params)
+
+    // get user id
+    var userID = req.user.id;
+
+    // There is nothing in the body for this request, it is a get request
+
+    var values = [userId];
+    db.user.view(pool, userID, values, completedQuery, failedQuery);
+
+    function completedQuery(qres){
+        if(qres.rowCount == 0){
+            result.setStatus(404);
+            result.addError("Unable To Find User With Specified ID")
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            var packed = qres.rows[0];
+            result.setStatus(200);
+            result.setPayload(packed);
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+        
+    }
+
+    function failedQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
 
 // delete /user/:id - Deletes User
 
+// post /user/updatepass - can only update own password
+router.post('/user/updatepass', function (req, res) {
 
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    // get user id
+    var userID = req.user.id;
+
+    // get json body
+    var body = req.body;
+
+    // TODO: Validation that password is not null or blank
+
+    // TODO: Permissions Checking
+
+    // The Following Elements Are Required For User Creation
+    // password - text
+    
+    // TODO Validate Required Fields
+
+    // Performs The Following Steps
+    // Create User Row - Return user_id
+    // Hash Password and Create User Auth With PIN Generation
+    // Return PinCode and Generated User
+    // Sends Verification Email
+
+    
+
+    // Bcrypt the Password
+    bcrypt.hash( body.password, 10 ).then( async (hash) => {
+        arguments.callee.displayName = "post-create-user";
+        //Create Param
+        var values = [hash];
+
+        db.user.updatePass(pool, userID, values, successCallback, failureCallback);
+
+        function successCallback(qres){
+            result.setStatus(204);
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    
+        function failureCallback(failure){
+            console.log("DB Query Failed")
+            if(failure.error){
+                console.log(failure.error.name);
+                //console.log(failure.error.message);
+                if(failure.error.constraint == 'users_email_key'){
+                    result.setStatus(403);
+                    result.addError("User Already Exists");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+               
+            }else{
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+        }
+    });
+});
 
 
 

@@ -52,7 +52,16 @@ const auth = {
         }
         console.log(query);
         performQuery_noValues(pool, query, successCallback, failureCallback);
-    }
+    },
+    updatePass(pool, userID, values, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET ROLE \'' + userID + '\'',
+            text: 'UPDATE public.auth SET pass = $1 WHERE user_id = \'' + userID + '\'',
+            //hashpass
+            values: values
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
 };
 
 const clock = {
@@ -145,6 +154,26 @@ const user = {
         };
         performQuery_withValues_noLocal(pool, query, successCallback, failureCallback);
     },
+    edit(pool, userID, values, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET ROLE \'' + userID + '\'',
+            text: 'UPDATE public.users SET permset=$1, email=$2, first_name=$3, middle_name=$4, last_name=$5 WHERE id = $6',
+            // permset, email, first_name, middle_name, last_name, user_id
+            values: values
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
+    view(pool, userID, values, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET ROLE \'' + userID + '\'',
+            text: 'SELECT usr.id as user_id, usr.created_by as created_by_id, CONCAT(usr_create.first_name, usr_create.last_name) as created_by, to_timestamp(usr.created_on) at time zone \'utc\' as created_on, usr.last_modified_by as last_modified_by_id, CONCAT(usr_last_mod.first_name, usr_last_mod.last_name) as last_modified_by, to_timestamp(usr.last_modified_on) at time zone \'utc\' as last_modified_on, usr.first_name, usr.middle_name, usr.last_name, usr.email FROM public.users as usr LEFT JOIN public.users as usr_create ON usr_create.id = usr.created_by LEFT JOIN public.users as usr_last_mod ON usr_last_mod.id = usr.last_modified_by WHERE usr.id = $1::UUID',
+            // user_id
+            values: values
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
+
+    
 };
 
 
