@@ -90,7 +90,6 @@ const User = require("../Models/User");
   *                  userId: "53924"
   *        "500":
   *          description: An Error has occured E100
-  *
   */
 
   /**
@@ -210,28 +209,28 @@ const User = require("../Models/User");
   *
   */
 
- // /**
- // * @swagger
- // * path:
- // *  /users/{userId}:
- // *    get:
- // *      summary: Get a user by id
- // *      tags: [Users]
- // *      parameters:
- // *        - in: path
- // *          name: userId
- // *          schema:
- // *            type: string
- // *          required: true
- // *          description: Id of the user
- // *      responses:
- // *        "200":
- // *          description: An users object
- // *          content:
- // *            application/json:
- // *              schema:
- // *                $ref: '#/components/schemas/User'
- // */
+ /**
+ * @swagger
+ * path:
+ *  /timesheets/:
+ *    get:
+ *      summary: Get a user by id
+ *      tags: [Users]
+ *      parameters:
+ *        - in: path
+ *          name: userId
+ *          schema:
+ *            type: string
+ *          required: true
+ *          description: Id of the user
+ *      responses:
+ *        "200":
+ *          description: An users object
+ *          content:
+ *            application/json:
+ *              schema:
+ *                $ref: '#/components/schemas/User'
+ */
 
  // /**
  // * @swagger
@@ -254,7 +253,6 @@ const User = require("../Models/User");
  // *              schema:
  // *                $ref: '#/components/schemas/User'
  // */
-
 
 
 router.post("/clock/in/", (req, res, next) => {
@@ -286,36 +284,11 @@ router.post("/clock/status/", (req, res, next) => {
   const user = new User(userId, eventDate, entryTime, punchType );
   res.json(req.body.userId);
 });
-
-
-
-
-// /**
-//  * @swagger
-//  * path:
-//  *  /users/:
-//  *    get:
-//  *      summary: Get all users
-//  *      tags: [Users]
-//  *      responses:
-//  *        "200":
-//  *          description: An array of users
-//   *          content:
-//   *            application/json:
-//   *              schema:
-//   *                $ref: '#/components/schemas/User'
-//  */
-
-// router.get("/users", (req, res, next) => {
-//   const userOne = new User("Alexander", "fake@gmail.com");
-//   const userTwo = new User("Ryan", "fakeagain@gmail.com");
-//   res.json({ userOne, userTwo });
-// });
-
-// router.get("/users/:userId", (req, res, next) => {
-//   const userOne = new User("Alexander", "fake@gmail.com");
-//   res.json({ userOne });
-// });
+router.post("/timesheets/", (req, res, next) => {
+  const { userId, eventDate, entryTime, punchType } = req.body;
+  const user = new User(userId, eventDate, entryTime, punchType );
+  res.json(req.body.userId);
+});
 
 
 // Swagger set up
