@@ -161,11 +161,17 @@ router.post('/clock/in', function (req, res) {
     // entryTime
     // punchType
     // notes
+    var pgTimeStamp;
+    if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
+        var d = new Date(body.eventDate + ' ' + body.entryTime);
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }else{
+        var d = new Date();
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }
 
     // Check if User Currently Clocked In
-    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
-
-    db.clock.in(pool, userID, values, completedQuery, failedQuery);
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
     function completedStatusQuery(qres){
         var statusOK = false;
@@ -261,10 +267,17 @@ router.post('/clock/out', function (req, res) {
     // punchType
     // notes
 
-    // Check if User Currently Clocked In
-    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+    var pgTimeStamp;
+    if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
+        var d = Date.parse(body.eventDate + ' ' + body.entryTime);
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }else{
+        var d = new Date();
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }
 
-    db.clock.out(pool, userID, values, completedQuery, failedQuery);
+    // Check if User Currently Clocked In
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
     function completedStatusQuery(qres){
         var statusOK = 'OK';
@@ -360,10 +373,17 @@ router.post('/break/start', function (req, res) {
     // punchType
     // notes
 
-    // Check if User Currently Clocked In
-    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+    var pgTimeStamp;
+    if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
+        var d = Date.parse(body.eventDate + ' ' + body.entryTime);
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }else{
+        var d = new Date();
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }
 
-    db.clockBreak.start(pool, userID, values, completedQuery, failedQuery);
+    // Check if User Currently Clocked In
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
     function completedStatusQuery(qres){
         var statusOK = 'OK';
@@ -460,9 +480,17 @@ router.post('/break/end', function (req, res) {
     // notes
 
     // Check if User Currently Clocked In
-    var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
 
-    db.clockBreak.end(pool, userID, values, completedQuery, failedQuery);
+    var pgTimeStamp;
+    if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
+        var d = Date.parse(body.eventDate + ' ' + body.entryTime);
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }else{
+        var d = new Date();
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }
+
+    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
     function completedStatusQuery(qres){
         var statusOK = 'OK';
