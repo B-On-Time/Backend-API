@@ -269,7 +269,7 @@ router.post('/clock/out', function (req, res) {
 
     var pgTimeStamp;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
-        var d = Date.parse(body.eventDate + ' ' + body.entryTime);
+        var d = new Date(body.eventDate + ' ' + body.entryTime);
         var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
     }else{
         var d = new Date();
@@ -375,7 +375,7 @@ router.post('/break/start', function (req, res) {
 
     var pgTimeStamp;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
-        var d = Date.parse(body.eventDate + ' ' + body.entryTime);
+        var d = new Date(body.eventDate + ' ' + body.entryTime);
         var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
     }else{
         var d = new Date();
@@ -483,7 +483,7 @@ router.post('/break/end', function (req, res) {
 
     var pgTimeStamp;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
-        var d = Date.parse(body.eventDate + ' ' + body.entryTime);
+        var d = new Date(body.eventDate + ' ' + body.entryTime);
         var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
     }else{
         var d = new Date();
