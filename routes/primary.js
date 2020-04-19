@@ -8,6 +8,8 @@ const uuidv4 = require('uuid/v4');
 const _ = require('underscore');
 var cors = require('cors');
 var cookieParser = require('cookie-parser');
+const bcrypt = require('bcryptjs');
+var nodemailer = require('nodemailer');
 //var mongoose = require('mongoose');
 //var mongodb = require('mongodb');
 
@@ -67,6 +69,17 @@ router.use((req, res, next) => { return authVerification(req, res, next)});
 // DB Setup
 // Postgres Setup
 const pool = new Pool( config.dbconfig.data );
+
+
+// Setup NodeMailer
+var transporter = nodemailer.createTransport({
+    service: 'Gmail', // no need to set host or port etc.
+    auth: {
+        type: "login", // default
+        user: config.email.email,
+        pass: config.email.password
+    }
+  });
 
 // // MongoDB Setup
 // mongoose.connect(config.dbconfig.mongoTest.connectionString, {useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true});
@@ -511,7 +524,6 @@ router.post('/break/end', function (req, res) {
     }
 });
 
-
 // Check Clock Status
 router.post('/clock/status', function (req, res) {
 
@@ -590,6 +602,233 @@ router.post('/clock/status', function (req, res) {
         }
     }
 });
+
+// List All Permissions Sets
+router.get('/permissions/list', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    log.info("Searching...")
+    console.log(req.params)
+
+    // get user id
+    var userID = req.user.id;
+
+    // There is nothing in the body for this request, it is a get request
+
+    db.permissions.list(pool, completedQuery, failedQuery);
+
+    function completedQuery(qres){
+        var packed = qres.rows;
+
+        result.setStatus(200);
+        result.setPayload(packed);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+
+    function failedQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
+
+// Get Permission Set For Current Role User Or Specified User
+router.post('/permissions', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    log.info("Searching...")
+    console.log(req.params)
+
+    // get user id
+    var userID = req.user.id;
+
+    // Optional Body Can Include
+    // userID - which is the user you wish to view the permission set of
+
+    // get json body
+    var body = req.body;
+
+    // TODO: Validation
+    if(_.has(body, 'userId')){
+        db.permissions.userByID(pool, body.userId, completedQuery, failedQuery);
+    }else{
+        db.permissions.userByRole(pool, userID, completedQuery, failedQuery);
+    }
+
+    // There is nothing in the body for this request, it is a get request
+    function completedQuery(qres){
+        // TODO: Validate That Row Exists
+
+        // TODO: Document Result
+        var packed = qres.rows[0];
+
+        result.setStatus(200);
+        result.setPayload(packed);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+
+    function failedQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
+
+// post /user - create user
+router.post('/user', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    // get user id
+    var userID = req.user.id;
+
+    // get json body
+    var body = req.body;
+
+    // TODO: Validation
+
+    // TODO: Permissions Checking
+
+    // The Following Elements Are Required For User Creation
+    // firstName - text
+    // middleName - text
+    // lastName - text
+    // email - text
+    // password - text
+    // permissions - OPTIONAL: UUID of permission set, if null defaults to standard employee
+
+    var permID;
+    if(_.has(body, 'permissions')){
+        permID = body.permissions;
+    }else{
+        permID = 'c779a171-c434-4900-9c1c-3ea48e14368c';
+    }
+    
+    // TODO Validate Required Fields
+
+    // Performs The Following Steps
+    // Create User Row - Return user_id
+    // Hash Password and Create User Auth With PIN Generation
+    // Return PinCode and Generated User
+    // Sends Verification Email
+
+    
+
+    // Bcrypt the Password
+    bcrypt.hash( body.password, 10 ).then( async (hash) => {
+        arguments.callee.displayName = "post-create-user";
+        //Create Param
+        var values = [body.firstName, body.middleName, body.lastName, body.email, permID, hash];
+
+        db.user.create(pool, userID, values, successCallback, failureCallback);
+
+        function successCallback(qres){
+            var resp = qres.rows[0];
+            // Respond With OK And 200
+            console.log(qres);
+            var packed = {
+                userID: resp.user_id,
+                firstName: resp.first_name,
+                middleName: resp.middle_name,
+                lastName: resp.last_name,
+                email: resp.email,
+                kioskPIN: resp.pin,
+            };
+
+            // Build Email
+            var mailOptions = {
+                from: config.email.email,
+                to: resp.email,
+                subject: 'B-On-Time Email Verification',
+                text: 'Follow This Link To Verify Your Email </br>' + config.domain.fqdn + '/verifyemail/' + resp.email_verification
+            };
+
+            // Send Email
+            transporter.sendMail(mailOptions, function(error, info){
+                if (error) {
+                    console.log(error);
+                } else {
+                    console.log('Email sent: ' + info.response);
+                }
+            }); 
+        
+            result.setStatus(200);
+            result.setPayload(packed);
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    
+        function failureCallback(failure){
+            console.log("DB Query Failed")
+            if(failure.error){
+                console.log(failure.error.name);
+                //console.log(failure.error.message);
+                if(failure.error.constraint == 'users_email_key'){
+                    result.setStatus(403);
+                    result.addError("User Already Exists");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+               
+            }else{
+                console.log(failure.result)
+                if(failure.result == "USERNAME ALREADY EXISTS"){
+                    result.setStatus(403);
+                    result.addError("User Already Exists");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    result.setStatus(403);
+                    result.addError("User Already Exists");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+            }
+        }
+    });
+});
+// put /user/:id - Update User - Updates In Place User
+
+// get /user/:id - Get Info On Single User
+
+// get /user - Info About all users
+
+// delete /user/:id - Deletes User
+
+
+
 
 
 

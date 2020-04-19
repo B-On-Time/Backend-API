@@ -29,6 +29,22 @@ var configs = [
       isJSON: false,
       assertHas: [],
       file: path.join(__dirname, "keys/jwt-rsa.public")
+    },
+    {
+      human_name: "Gmail - Password Verification And Reset Link Account",
+      key_name: 'email',
+      type: "Config File",
+      isJSON: true,
+      assertHas: ['email', 'password'],
+      file: path.join(__dirname, "email.json")
+    },
+    {
+      human_name: "Domain Name: FQDN",
+      key_name: 'domain',
+      type: "Config File",
+      isJSON: true,
+      assertHas: ['fqdn'],
+      file: path.join(__dirname, "domain.json")
     }
 
 ];

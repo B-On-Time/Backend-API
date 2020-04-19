@@ -92,3 +92,9 @@ config/db-connection.json
 
 # Keys
 config/keys/*.*
+
+# Email Account
+config/email.json
+
+# Domain
+config/domain.json
