@@ -1052,6 +1052,47 @@ router.post('/user/updatepass', function (req, res) {
     });
 });
 
+// List All Users
+router.get('/user/list', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    log.info("Searching...")
+    console.log(req.params)
+
+    // get user id
+    var userID = req.user.id;
+
+    // There is nothing in the body for this request, it is a get request
+
+    db.user.list(pool, userID, completedQuery, failedQuery);
+
+    function completedQuery(qres){
+        var packed = qres.rows;
+        result.setStatus(200);
+        result.setPayload(packed);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+
+    function failedQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
+
 
 
 
