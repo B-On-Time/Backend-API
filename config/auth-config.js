@@ -39,11 +39,11 @@ var configs = [
       file: path.join(__dirname, "email.json")
     },
     {
-      human_name: "Domain Name: FQDN",
+      human_name: "Server Domain Names",
       key_name: 'domain',
       type: "Config File",
       isJSON: true,
-      assertHas: ['fqdn'],
+      assertHas: ['web', 'api'],
       file: path.join(__dirname, "domain.json")
     }
 

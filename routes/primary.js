@@ -1038,8 +1038,8 @@ router.post('/user', function (req, res) {
             var mailOptions = {
                 from: config.email.email,
                 to: resp.email,
-                subject: 'B-On-Time Email Verification',
-                text: 'Follow This Link To Verify Your Email </br>' + config.domain.fqdn + '/verifyemail/' + resp.email_verification
+                subject: 'B-On-Time Account Notification And Email Verification',
+                html: '<b>You Have Been Assigned A B-On-Time Account</b></br>Follow This Link To Verify Your Email:</br> <a href=\'' + config.domain.fqdn + '/actions/verifyemail.html?v=' + resp.email_verification + '\'>' + config.domain.api + '/actions/verifyemail.html?v=' + resp.email_verification  +'</a>'
             };
 
             // Send Email

@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const express = require('express');
 var router = express.Router();
 const { Pool } = require('pg');
@@ -20,10 +21,12 @@ const config = require('../config/auth-config.js');
 const authVerification = require('../middleware/checkauth.js');
 
 // Setup Express So That It Can Serve Pages
-router.use(express.static('public'));
+var publicDir = path.join(__dirname, '../public');
 
-router.get('/test/fileserve', function (req, res) {
-    res.sendFile(path.join(__dirname,'html','emailverification.html'));
+
+
+router.get('/verifyemail.html', function (req, res) {
+    res.sendFile(path.join(publicDir,'actions','verifyemail.html'));
 })
 
 // router.get('/verify/:verificationID', function (req, res) {

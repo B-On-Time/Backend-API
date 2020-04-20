@@ -411,6 +411,8 @@ router.get('/verify/:verificationID', function (req, res) {
 
     var verID = req.params.verificationID
 
+    db.user.verifyEmail(pool, verID, completedQuery, failedQuery);
+    
     // There is nothing in the body for this request, it is a get request
     function completedQuery(qres){
         // TODO: Validate That Row Exists
