@@ -166,10 +166,17 @@ router.post('/clock/in', function (req, res) {
     var pgDate;
     var pgTime;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
-        var d = new Date(body.eventDate + ' ' + body.entryTime);
-        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
-        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
-        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        if(body.eventDate != null && body.entryTime != null && body.entryDate != '' && body.entryTime != '' ){
+            var d = new Date(body.eventDate + ' ' + body.entryTime);
+            pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
+            pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+            pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }else{
+            var d = new Date();
+            pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+            pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+            pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }
     }else{
         var d = new Date();
         pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
@@ -180,7 +187,12 @@ router.post('/clock/in', function (req, res) {
     var uid;
     if(_.has(body, 'userId')){
         // Todo Validate Permissions On User
-        uid = body.userId;
+        if(body.userId != '' && body.userId != null && body.userId != undefined){
+            uid = body.userId;
+        }else{
+            // Default To Current User When None Is Given
+            uid = userID;  
+        }
     }else{
         // Default To Current User When None Is Given
         uid = userID;
@@ -314,10 +326,17 @@ router.post('/clock/out', function (req, res) {
     var pgDate;
     var pgTime;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
-        var d = new Date(body.eventDate + ' ' + body.entryTime);
-        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
-        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
-        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        if(body.eventDate != null && body.entryTime != null && body.entryDate != '' && body.entryTime != '' ){
+            var d = new Date(body.eventDate + ' ' + body.entryTime);
+            pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
+            pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+            pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }else{
+            var d = new Date();
+            pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+            pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+            pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }
     }else{
         var d = new Date();
         pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
@@ -328,7 +347,12 @@ router.post('/clock/out', function (req, res) {
     var uid;
     if(_.has(body, 'userId')){
         // Todo Validate Permissions On User
-        uid = body.userId;
+        if(body.userId != '' && body.userId != null && body.userId != undefined){
+            uid = body.userId;
+        }else{
+            // Default To Current User When None Is Given
+            uid = userID;  
+        }
     }else{
         // Default To Current User When None Is Given
         uid = userID;
@@ -461,10 +485,17 @@ router.post('/break/start', function (req, res) {
     var pgDate;
     var pgTime;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
-        var d = new Date(body.eventDate + ' ' + body.entryTime);
-        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
-        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
-        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        if(body.eventDate != null && body.entryTime != null && body.entryDate != '' && body.entryTime != '' ){
+            var d = new Date(body.eventDate + ' ' + body.entryTime);
+            pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
+            pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+            pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }else{
+            var d = new Date();
+            pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+            pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+            pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }
     }else{
         var d = new Date();
         pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
@@ -475,7 +506,12 @@ router.post('/break/start', function (req, res) {
     var uid;
     if(_.has(body, 'userId')){
         // Todo Validate Permissions On User
-        uid = body.userId;
+        if(body.userId != '' && body.userId != null && body.userId != undefined){
+            uid = body.userId;
+        }else{
+            // Default To Current User When None Is Given
+            uid = userID;  
+        }
     }else{
         // Default To Current User When None Is Given
         uid = userID;
@@ -609,10 +645,17 @@ router.post('/break/end', function (req, res) {
     var pgDate;
     var pgTime;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
-        var d = new Date(body.eventDate + ' ' + body.entryTime);
-        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
-        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
-        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        if(body.eventDate != null && body.entryTime != null && body.entryDate != '' && body.entryTime != '' ){
+            var d = new Date(body.eventDate + ' ' + body.entryTime);
+            pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
+            pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+            pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }else{
+            var d = new Date();
+            pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+            pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+            pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }
     }else{
         var d = new Date();
         pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
@@ -623,7 +666,12 @@ router.post('/break/end', function (req, res) {
     var uid;
     if(_.has(body, 'userId')){
         // Todo Validate Permissions On User
-        uid = body.userId;
+        if(body.userId != '' && body.userId != null && body.userId != undefined){
+            uid = body.userId;
+        }else{
+            // Default To Current User When None Is Given
+            uid = userID;  
+        }
     }else{
         // Default To Current User When None Is Given
         uid = userID;
@@ -747,16 +795,28 @@ router.post('/clock/status', function (req, res) {
     // userId - User you seek to lookup the staus of, OPTIONAL, if NULL then assume user is self
     // seekTimestamp FORMAT: 'YYYY-MM-DD HH:MM:SS' OR NULL, NULL will assume that status is for current time
 
-    var userId;
+    var uid;
     if(_.has(body, 'userId')){
-        userId = body.userId;
+        // Todo Validate Permissions On User
+        if(body.userId != '' && body.userId != null && body.userId != undefined){
+            uid = body.userId;
+        }else{
+            // Default To Current User When None Is Given
+            uid = userID;  
+        }
     }else{
-        userId = userID;
+        // Default To Current User When None Is Given
+        uid = userID;
     }
 
     var pgTimeStamp;
     if(_.has(body, 'seekTimestamp')){
-        pgTimeStamp = body.seekTimestamp;
+        if(body.seekTimestamp != null && body.seekTimestamp != ''){
+            pgTimeStamp = body.seekTimestamp;
+        }else{
+            var d = new Date();
+            var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }
     }else{
         var d = new Date();
         var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
@@ -828,7 +888,12 @@ router.post('/clock/status/all', function (req, res) {
 
     var pgTimeStamp;
     if(_.has(body, 'seekTimestamp')){
-        pgTimeStamp = body.seekTimestamp;
+        if(body.seekTimestamp != null && body.seekTimestamp != ''){
+            pgTimeStamp = body.seekTimestamp;
+        }else{
+            var d = new Date();
+            var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
+        }
     }else{
         var d = new Date();
         var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
