@@ -5,11 +5,9 @@ const router = express.Router();
 const swaggerJsdoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
 
+
 // App Modules
 const User = require("../Models/User");
-
-
-
 
 
 /**
@@ -25,7 +23,7 @@ const User = require("../Models/User");
  *  /clock/in/:
  *    post:
  *      summary: Logs a user in.
- *      tags: [Users]
+ *      tags: [Endpoints]
  *      requestBody:
  *        required: true
  *        content:
@@ -61,7 +59,7 @@ const User = require("../Models/User");
   *  /clock/status/:
   *    post:
   *      summary: Checks the clock status
-  *      tags: [Users]
+  *      tags: [Endpoints]
   *      requestBody:
   *        required: true
   *        content:
@@ -70,7 +68,7 @@ const User = require("../Models/User");
   *              type: object
   *              properties:
   *                userId:
-  *                  type: integer
+  *                  type: string
   *                  description: Identification number of the user
   *                  example: 312458
   *
@@ -96,7 +94,7 @@ const User = require("../Models/User");
    *  /break/end/:
    *    post:
    *      summary: Logs a user out of break mode.
-   *      tags: [Users]
+   *      tags: [Endpoints]
    *      requestBody:
    *        required: true
    *        content:
@@ -105,7 +103,7 @@ const User = require("../Models/User");
    *              type: object
    *              properties:
    *                userId:
-   *                  type: integer
+   *                  type: string
    *                  description: Identification number of the user
    *                  example: 312458
    *      responses:
@@ -136,7 +134,7 @@ const User = require("../Models/User");
  *  /break/start/:
  *    post:
  *      summary: Logs a user into break mode.
- *      tags: [Users]
+ *      tags: [Endpoints]
  *      requestBody:
  *        required: true
  *        content:
@@ -145,7 +143,7 @@ const User = require("../Models/User");
  *              type: object
  *              properties:
  *                userId:
- *                  type: integer
+ *                  type: string
  *                  description: Identification number of the user
  *                  example: "312458"
 
@@ -159,7 +157,7 @@ const User = require("../Models/User");
  *              type: object
  *              properties:
  *                userId:
- *                  type: integer
+ *                  type: string
  *                  description: Identification number of the user
  *                  example: "87457"
  *        "404":
@@ -177,7 +175,7 @@ const User = require("../Models/User");
   *  /clock/out/:
   *    post:
   *      summary: Logs a user out.
-  *      tags: [Users]
+  *      tags: [Endpoints]
   *      requestBody:
   *        required: true
   *        content:
@@ -211,8 +209,8 @@ const User = require("../Models/User");
  * path:
  *  /timesheets:
  *    get:
- *      summary: Get timesheets of users
- *      tags: [Users]
+ *      summary: Get timesheets of all users
+ *      tags: [Endpoints]
  *      responses:
  *        "200":
  *          description: Timesheet of all users
@@ -224,6 +222,38 @@ const User = require("../Models/User");
  *                 type:[]
  *
  */
+ /**
+ * @swagger
+ * path:
+ *  /timesheets/{user}:
+ *    get:
+ *      summary: Get timesheet of a user
+ *      tags: [Endpoints]
+ *      parameters:
+ *         - in: path
+ *           name: user
+ *           description: Get timesheet of user
+ *           schema:
+ *             type: string
+ *             example: "0928234"
+ *             description: enter id number of user
+ *      responses:
+ *        "200":
+ *          description: Timesheet of a particular user
+ *          content:
+ *            application/json:
+ *              schema:
+ *                $ref: '#/components/schemas/User'
+ *        "400":
+ *           description: Request Requires Parameter id to be filled
+ *        "500":
+ *           description: Internal Server Error
+ *        "404":
+ *           description: User does not exist!
+ *
+ *
+ *
+ */
 
  // /**
  // * @swagger
@@ -231,7 +261,7 @@ const User = require("../Models/User");
  // *  /users/:
  // *    get:
  // *      summary: Get all users
- // *      tags: [Users]
+ // *      tags: [Endpoints]
  // *      parameters:
  // *        - in: query
  // *          name: name
@@ -295,15 +325,14 @@ router.get("/timesheets", (req, res, next) => {
 });
 
 
+router.get("/timesheets/:user", (req, res, next) => {
 
-router.post("/timesheets/:id", (req, res, next) => {
-
-  const user1 = new User(req.body.userId, req.body.eventDate, req.body.entryTime, req.body.punchType);
-
-
+  // test data
+  const user1 = new User("12345", "01/03/2020", "07:48", "WORK" );
 
 
-  res.json(req.body.userId);
+
+  res.json(user1);
 });
 
 
