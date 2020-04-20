@@ -8,11 +8,26 @@ const swaggerUi = require("swagger-ui-express");
 // App Modules
 const User = require("../Models/User");
 
+
+
+
 /**
  * @swagger
  * tags:
  *   name: Endpoints
  *   description: Explore the API Endpoints
+ */
+/**
+ * @swagger
+ *
+ *components:
+ *   securitySchemes:
+ *     BasicAuth:
+ *       type: http
+ *       scheme: basic
+ *
+ *
+ *
  */
 
 /**
@@ -30,7 +45,7 @@ const User = require("../Models/User");
  *              $ref: '#/components/schemas/User'
  *      responses:
  *        "200":
- *          description: A user schema
+ *          description: The user who clocked in
  *          content:
  *            application/json:
  *              schema:
@@ -82,12 +97,6 @@ const User = require("../Models/User");
   *          description: User cannot be found.
   *        "403":
   *          description: User cannot clock in, Already clocked in.
-  *          content:
-  *           application/json:
-  *            schema:
-  *              type: object
-  *              properties:
-  *                  userId: "53924"
   *        "500":
   *          description: An Error has occured E100
   */
@@ -150,7 +159,7 @@ const User = require("../Models/User");
  *                  type: integer
  *                  description: Identification number of the user
  *                  example: 312458
- *
+
  *
  *      responses:
  *        "200":
@@ -158,17 +167,16 @@ const User = require("../Models/User");
  *          content:
  *            application/json:
  *              schema:
- *                $ref: '#/components/schemas/User'
+ *              type: object
+ *              properties:
+ *                userId:
+ *                  type: integer
+ *                  description: Identification number of the user
+ *                  example: 87457
  *        "404":
  *          description: User cannot be found.
  *        "403":
- *          description: User cannot clock in, Already clocked in.
- *          content:
- *           application/json:
- *            schema:
- *              type: object
- *              properties:
- *                  userId: "53924"
+ *          description: make sure you're clocked in and not on break
  *        "500":
  *          description: An Error has occured E100
  *
@@ -212,24 +220,19 @@ const User = require("../Models/User");
  /**
  * @swagger
  * path:
- *  /timesheets/:
+ *  /timesheets:
  *    get:
- *      summary: Get a user by id
+ *      summary: Get timesheets of users
  *      tags: [Users]
- *      parameters:
- *        - in: path
- *          name: userId
- *          schema:
- *            type: string
- *          required: true
- *          description: Id of the user
  *      responses:
  *        "200":
- *          description: An users object
+ *          description: An array of users timesheets
  *          content:
  *            application/json:
  *              schema:
- *                $ref: '#/components/schemas/User'
+ *                type: object
+ *                parameters:
+ *
  */
 
  // /**
@@ -284,7 +287,28 @@ router.post("/clock/status/", (req, res, next) => {
   const user = new User(userId, eventDate, entryTime, punchType );
   res.json(req.body.userId);
 });
-router.post("/timesheets/", (req, res, next) => {
+
+router.get("/timesheets", (req, res, next) => {
+  const { userId, eventDate, entryTime, punchType } = req.body;
+
+
+  // other users already in the system.. Test data
+  const user1 = new User(req.body.userId, req.body.eventDate, req.body.entryTime, req.body.punchType);
+  const user2 = new User("564782", "01/03/2020", "07:48", "WORK" );
+  const user3 = new User("107589", "01/04/2020", "17:28", "WORK" );
+  const user4 = new User("078924", "01/05/2020", "12:48", "PTO" );
+  const user5 = new User("335470", "02/05/2020", "00:05", "ADMIN" );
+  const user6 = new User("335470", "02/05/2020", "00:05", "ADMIN" );
+  const user7 = new User("335470", "02/05/2020", "00:05", "ADMIN" );
+
+
+
+  res.json(text);
+});
+
+
+
+router.post("/timesheets/:id", (req, res, next) => {
   const { userId, eventDate, entryTime, punchType } = req.body;
   const user = new User(userId, eventDate, entryTime, punchType );
   res.json(req.body.userId);

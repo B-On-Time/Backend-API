@@ -25,7 +25,7 @@ module.exports = User;
  *          - notes
  *        properties:
  *          userId:
- *            type: integer
+ *            type: string
  *            description: Users identification number
  *          eventDate:
  *            type: string
