@@ -201,7 +201,6 @@ router.post('/clock/in', function (req, res) {
         }else{
             result.addError("Malformed Request - punchType is invalid. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)"); 
         }
-        punchTypeCleaned = body.notes;
     }else{
         result.addError("Malformed Request - Request Must Contain punchType in body. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)");
     }
@@ -350,7 +349,6 @@ router.post('/clock/out', function (req, res) {
         }else{
             result.addError("Malformed Request - punchType is invalid. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)"); 
         }
-        punchTypeCleaned = body.notes;
     }else{
         result.addError("Malformed Request - Request Must Contain punchType in body. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)");
     }
@@ -498,7 +496,6 @@ router.post('/break/start', function (req, res) {
         }else{
             result.addError("Malformed Request - punchType is invalid. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)"); 
         }
-        punchTypeCleaned = body.notes;
     }else{
         result.addError("Malformed Request - Request Must Contain punchType in body. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)");
     }
@@ -647,7 +644,6 @@ router.post('/break/end', function (req, res) {
         }else{
             result.addError("Malformed Request - punchType is invalid. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)"); 
         }
-        punchTypeCleaned = body.notes;
     }else{
         result.addError("Malformed Request - Request Must Contain punchType in body. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)");
     }

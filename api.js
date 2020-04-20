@@ -13,6 +13,7 @@ const log = require('./libraries/logging.js');
 //Routes
 var primary = require('./routes/primary.js');
 var auth = require('./routes/auth.js');
+var actions = require('./routes/pages.js');
 // Hard Coded Configs
 var service_port = 3030;
 
@@ -100,6 +101,9 @@ app.get('/presentation', async function(req, res) {
 // Routes - START
 // Users and Authentication
 app.use('/auth', auth);
+
+// Served Pages
+app.use('/actions', actions);
 
 // Primary Route
 app.use('/', primary);
