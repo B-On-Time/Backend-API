@@ -11,23 +11,12 @@ const User = require("../Models/User");
 
 
 
+
 /**
  * @swagger
  * tags:
  *   name: Endpoints
  *   description: Explore the API Endpoints
- */
-/**
- * @swagger
- *
- *components:
- *   securitySchemes:
- *     BasicAuth:
- *       type: http
- *       scheme: basic
- *
- *
- *
  */
 
 /**
@@ -45,7 +34,7 @@ const User = require("../Models/User");
  *              $ref: '#/components/schemas/User'
  *      responses:
  *        "200":
- *          description: The user who clocked in
+ *          description: A user schema
  *          content:
  *            application/json:
  *              schema:
@@ -158,7 +147,7 @@ const User = require("../Models/User");
  *                userId:
  *                  type: integer
  *                  description: Identification number of the user
- *                  example: 312458
+ *                  example: "312458"
 
  *
  *      responses:
@@ -172,7 +161,7 @@ const User = require("../Models/User");
  *                userId:
  *                  type: integer
  *                  description: Identification number of the user
- *                  example: 87457
+ *                  example: "87457"
  *        "404":
  *          description: User cannot be found.
  *        "403":
@@ -226,12 +215,13 @@ const User = require("../Models/User");
  *      tags: [Users]
  *      responses:
  *        "200":
- *          description: An array of users timesheets
+ *          description: Timesheet of all users
  *          content:
  *            application/json:
  *              schema:
  *                type: object
  *                parameters:
+ *                 type:[]
  *
  */
 
@@ -288,29 +278,31 @@ router.post("/clock/status/", (req, res, next) => {
   res.json(req.body.userId);
 });
 
+
 router.get("/timesheets", (req, res, next) => {
-  const { userId, eventDate, entryTime, punchType } = req.body;
 
 
   // other users already in the system.. Test data
-  const user1 = new User(req.body.userId, req.body.eventDate, req.body.entryTime, req.body.punchType);
-  const user2 = new User("564782", "01/03/2020", "07:48", "WORK" );
-  const user3 = new User("107589", "01/04/2020", "17:28", "WORK" );
-  const user4 = new User("078924", "01/05/2020", "12:48", "PTO" );
-  const user5 = new User("335470", "02/05/2020", "00:05", "ADMIN" );
-  const user6 = new User("335470", "02/05/2020", "00:05", "ADMIN" );
-  const user7 = new User("335470", "02/05/2020", "00:05", "ADMIN" );
+  const john = new User("564782", "01/03/2020", "07:48", "WORK" );
+  const paul = new User("107589", "01/04/2020", "17:28", "WORK" );
+  const tim = new User("078924", "01/05/2020", "12:48", "PTO" );
+  const donna = new User("335470", "02/15/2020", "00:05", "ADMIN" );
+  const peter = new User("464535", "02/15/2020", "00:29", "ADMIN" );
+  const sarah = new User("346230", "02/06/2020", "00:52", "WORK" );
 
 
-
-  res.json(text);
+  return res.json( {john,paul,tim,donna,peter,sarah} );
 });
 
 
 
 router.post("/timesheets/:id", (req, res, next) => {
-  const { userId, eventDate, entryTime, punchType } = req.body;
-  const user = new User(userId, eventDate, entryTime, punchType );
+
+  const user1 = new User(req.body.userId, req.body.eventDate, req.body.entryTime, req.body.punchType);
+
+
+
+
   res.json(req.body.userId);
 });
 
@@ -328,15 +320,15 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:3000/api/v1"
+        url: "http://localhost:5433/"
       }
     ]
   },
   apis: ["./Models/User.js", "./Routes/index.js"]
 };
 const specs = swaggerJsdoc(options);
-router.use("/docs", swaggerUi.serve);
-router.get("/docs", swaggerUi.setup(specs, { explorer: true }));
+router.use("/documentation", swaggerUi.serve);
+router.get("/documentation", swaggerUi.setup(specs, { explorer: true }));
 
 // catch 404 and forward to error handler
 router.use(function(req, res, next) {

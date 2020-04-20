@@ -42,9 +42,9 @@ module.exports = User;
  *              description: Notes for the day
  *
  *        example:
- *           "userId": 9161725
- *           "eventDate": "12/01/2104"
- *           "entryTime": "21:34"
- *           "punchType": "PTO"
- *           "notes": "I parked in the garage"
+ *           "userId": "000000"
+ *           "eventDate": "00/00/0000"
+ *           "entryTime": "00:00"
+ *           "punchType": "ADMIN"
+ *           "notes": "NOTES TO REMEMBER"
  */

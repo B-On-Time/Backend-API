@@ -14,6 +14,6 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
 // include routes
-app.use("/api/v1", routes);
+app.use("/", routes);
 
-app.listen(3000, () => console.log(`Swagger That API listening on port 3000!`));
+app.listen(5433, () => console.log(`Listening on port 5433:`));
