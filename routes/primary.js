@@ -156,87 +156,131 @@ router.post('/clock/in', function (req, res) {
     // TODO: Permissions Checking
 
     // Assumes The Following Exist In Body
-    // userId
-    // eventDate
-    // entryTime
-    // punchType
-    // notes
+    // userId - Optional, If Not Given, Defaults to User Intends Self
+    // eventDate - Optional, If Not Given, Defaults To NOW - If given must be in format YYYY-MM-DD
+    // entryTime - Optional, If Not Given, Defaults To NOW - If Given Must Be In Format HH12:MI AM/PM
+    // punchType - Required MUST BE ONE OF: WORK, PTO, UPTO, ADMIN
+    // notes - Optional, Text. Defaults To Null
+
     var pgTimeStamp;
+    var pgDate;
+    var pgTime;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
         var d = new Date(body.eventDate + ' ' + body.entryTime);
-        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
+        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
     }else{
         var d = new Date();
-        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
     }
-    console.log(pgTimeStamp);
-    // Check if User Currently Clocked In
-    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
-    function completedStatusQuery(qres){
-        var statusOK = false;
-        if(qres.rowCount == 0){
-            statusOK = true;
-        }else if(qres.rows[0].current_status != 'Clocked Out' ){
-            statusOK = false;
+    var uid;
+    if(_.has(body, 'userId')){
+        // Todo Validate Permissions On User
+        uid = body.userId;
+    }else{
+        // Default To Current User When None Is Given
+        uid = userID;
+    }
+
+    var notes;
+    if(_.has(body, 'notes')){
+        notes = body.notes;
+    }else{
+        notes = null;
+    }
+
+    var allowedPunchTypes = ["WORK","PTO","UPTO","ADMIN"];
+    var punchTypeCleaned;
+    if(_.has(body, 'punchType')){
+        if(allowedPunchTypes.includes(body.punchType)){
+            punchTypeCleaned = body.punchType;
         }else{
-            statusOK = true;
+            result.addError("Malformed Request - punchType is invalid. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)"); 
         }
-        
-        if(statusOK){
-            // Perform Clock In
-            var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+        punchTypeCleaned = body.notes;
+    }else{
+        result.addError("Malformed Request - Request Must Contain punchType in body. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)");
+    }
 
-            db.clock.in(pool, userID, values, completedQuery, failedQuery);
+    if(result.hasErrors()){
+        result.setStatus(400);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result); 
+    }else{
+         // Check if User Currently Clocked In
+        db.clock.status(pool, userID, uid, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
-            function completedQuery(qres){
-                var packed = {
-                    punch_id: qres.rows[0].punch_event_id,
-                };
-                result.setStatus(200);
-                result.setPayload(packed);
-                res.status(result.getStatus()).type('application/json').send(result.getPayload());
-                timer.endTimer(result);
+        function completedStatusQuery(qres){
+            var statusOK = false;
+            if(qres.rowCount == 0){
+                statusOK = true;
+            }else if(qres.rows[0].current_status != 'Clocked Out' ){
+                statusOK = false;
+            }else{
+                statusOK = true;
             }
+            
+            if(statusOK){
+                // Perform Clock In
+                var values = [uid, pgDate, pgTime, punchTypeCleaned, notes];
 
-            function failedQuery(failure){
-                console.log("Failure Called")
-                if(failure.error){
-                    result.setStatus(500);
-                    result.addError("An Error Has Occured E100");
-                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
-                    timer.endTimer(result);
-                }else{
-                    console.log(failure.result)
-                    result.setStatus(500);
-                    result.addError("An Error Has Occured E100");
+                db.clock.in(pool, userID, values, completedQuery, failedQuery);
+
+                function completedQuery(qres){
+                    var packed = {
+                        punch_id: qres.rows[0].punch_event_id,
+                    };
+                    result.setStatus(200);
+                    result.setPayload(packed);
                     res.status(result.getStatus()).type('application/json').send(result.getPayload());
                     timer.endTimer(result);
                 }
+
+                function failedQuery(failure){
+                    console.log("Failure Called")
+                    if(failure.error){
+                        result.setStatus(500);
+                        result.addError("An Error Has Occured E100");
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }else{
+                        console.log(failure.result)
+                        result.setStatus(500);
+                        result.addError("An Error Has Occured E100");
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }
+                }
+            }else{
+                result.setStatus(403);
+                result.addError("Cannot Clock In, Already Clocked In");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result); 
             }
-        }else{
-            result.setStatus(403);
-            result.addError("Cannot Clock In, Already Clocked In");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result); 
+        }
+
+        function failedStatusQuery(failure){
+            console.log("Failure Called")
+            if(failure.error){
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
         }
     }
 
-    function failedStatusQuery(failure){
-        console.log("Failure Called")
-        if(failure.error){
-            result.setStatus(500);
-            result.addError("An Error Has Occured E100");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result);
-        }else{
-            console.log(failure.result)
-            result.setStatus(500);
-            result.addError("An Error Has Occured E100");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result);
-        }
-    }
+   
 
     
 });
@@ -268,81 +312,123 @@ router.post('/clock/out', function (req, res) {
     // notes
 
     var pgTimeStamp;
+    var pgDate;
+    var pgTime;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
         var d = new Date(body.eventDate + ' ' + body.entryTime);
-        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
+        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
     }else{
         var d = new Date();
-        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
     }
 
-    // Check if User Currently Clocked In
-    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+    var uid;
+    if(_.has(body, 'userId')){
+        // Todo Validate Permissions On User
+        uid = body.userId;
+    }else{
+        // Default To Current User When None Is Given
+        uid = userID;
+    }
 
-    function completedStatusQuery(qres){
-        var statusOK = 'OK';
-        if(qres.rowCount == 0){
-            statusOK = 'Cannot Clock Out, Not Clocked In';
-        }else if(qres.rows[0].current_status == 'On Break'){
-            statusOK = 'Cannot Clock Out, Currently On Break. End Break, Then Clock Out';
-        }else if(qres.rows[0].current_status == 'Clocked Out'){
-            statusOK = 'Cannot Clock Out, Already Clocked Out';
+    var notes;
+    if(_.has(body, 'notes')){
+        notes = body.notes;
+    }else{
+        notes = null;
+    }
+
+    var allowedPunchTypes = ["WORK","PTO","UPTO","ADMIN"];
+    var punchTypeCleaned;
+    if(_.has(body, 'punchType')){
+        if(allowedPunchTypes.includes(body.punchType)){
+            punchTypeCleaned = body.punchType;
         }else{
-            statusOK = 'OK';
+            result.addError("Malformed Request - punchType is invalid. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)"); 
         }
-        
-        if(statusOK == 'OK'){
-            // Perform Clock In
-            var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+        punchTypeCleaned = body.notes;
+    }else{
+        result.addError("Malformed Request - Request Must Contain punchType in body. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)");
+    }
 
-            db.clock.out(pool, userID, values, completedQuery, failedQuery);
+    if(result.hasErrors()){
+        result.setStatus(400);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result); 
+    }else{
 
-            function completedQuery(qres){
-                var packed = {
-                    punch_id: qres.rows[0].punch_event_id,
-                };
-                result.setStatus(200);
-                result.setPayload(packed);
-                res.status(result.getStatus()).type('application/json').send(result.getPayload());
-                timer.endTimer(result);
+        // Check if User Currently Clocked In
+        db.clock.status(pool, userID, uid, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+
+        function completedStatusQuery(qres){
+            var statusOK = 'OK';
+            if(qres.rowCount == 0){
+                statusOK = 'Cannot Clock Out, Not Clocked In';
+            }else if(qres.rows[0].current_status == 'On Break'){
+                statusOK = 'Cannot Clock Out, Currently On Break. End Break, Then Clock Out';
+            }else if(qres.rows[0].current_status == 'Clocked Out'){
+                statusOK = 'Cannot Clock Out, Already Clocked Out';
+            }else{
+                statusOK = 'OK';
             }
+            
+            if(statusOK == 'OK'){
+                // Perform Clock In
+                var values = [uid, pgDate, pgTime, punchTypeCleaned, notes];
 
-            function failedQuery(failure){
-                console.log("Failure Called")
-                if(failure.error){
-                    result.setStatus(500);
-                    result.addError("An Error Has Occured E100");
-                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
-                    timer.endTimer(result);
-                }else{
-                    console.log(failure.result)
-                    result.setStatus(500);
-                    result.addError("An Error Has Occured E100");
+                db.clock.out(pool, userID, values, completedQuery, failedQuery);
+
+                function completedQuery(qres){
+                    var packed = {
+                        punch_id: qres.rows[0].punch_event_id,
+                    };
+                    result.setStatus(200);
+                    result.setPayload(packed);
                     res.status(result.getStatus()).type('application/json').send(result.getPayload());
                     timer.endTimer(result);
                 }
-            }
-        }else{
-            result.setStatus(403);
-            result.addError(statusOK);
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result); 
-        }
-    }
 
-    function failedStatusQuery(failure){
-        console.log("Failure Called")
-        if(failure.error){
-            result.setStatus(500);
-            result.addError("An Error Has Occured E100");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result);
-        }else{
-            console.log(failure.result)
-            result.setStatus(500);
-            result.addError("An Error Has Occured E100");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result);
+                function failedQuery(failure){
+                    console.log("Failure Called")
+                    if(failure.error){
+                        result.setStatus(500);
+                        result.addError("An Error Has Occured E100");
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }else{
+                        console.log(failure.result)
+                        result.setStatus(500);
+                        result.addError("An Error Has Occured E100");
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }
+                }
+            }else{
+                result.setStatus(403);
+                result.addError(statusOK);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result); 
+            }
+        }
+
+        function failedStatusQuery(failure){
+            console.log("Failure Called")
+            if(failure.error){
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
         }
     }
 });
@@ -374,81 +460,122 @@ router.post('/break/start', function (req, res) {
     // notes
 
     var pgTimeStamp;
+    var pgDate;
+    var pgTime;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
         var d = new Date(body.eventDate + ' ' + body.entryTime);
-        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
+        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
     }else{
         var d = new Date();
-        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
     }
 
-    // Check if User Currently Clocked In
-    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+    var uid;
+    if(_.has(body, 'userId')){
+        // Todo Validate Permissions On User
+        uid = body.userId;
+    }else{
+        // Default To Current User When None Is Given
+        uid = userID;
+    }
 
-    function completedStatusQuery(qres){
-        var statusOK = 'OK';
-        if(qres.rowCount == 0){
-            statusOK = 'Cannot Start Break, Not Clocked In';
-        }else if(qres.rows[0].current_status == 'On Break'){
-            statusOK = 'Cannot Start Break, Currently On Break. End Break, Then Start Another';
-        }else if(qres.rows[0].current_status == 'Clocked Out'){
-            statusOK = 'Cannot Start Break, While Clocked Out';
+    var notes;
+    if(_.has(body, 'notes')){
+        notes = body.notes;
+    }else{
+        notes = null;
+    }
+
+    var allowedPunchTypes = ["WORK","PTO","UPTO","ADMIN"];
+    var punchTypeCleaned;
+    if(_.has(body, 'punchType')){
+        if(allowedPunchTypes.includes(body.punchType)){
+            punchTypeCleaned = body.punchType;
         }else{
-            statusOK = 'OK';
+            result.addError("Malformed Request - punchType is invalid. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)"); 
         }
-        
-        if(statusOK == 'OK'){
-            // Perform Clock In
-            var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+        punchTypeCleaned = body.notes;
+    }else{
+        result.addError("Malformed Request - Request Must Contain punchType in body. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)");
+    }
 
-            db.clockBreak.start(pool, userID, values, completedQuery, failedQuery);
+    if(result.hasErrors()){
+        result.setStatus(400);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result); 
+    }else{
+        // Check if User Currently Clocked In
+        db.clock.status(pool, userID, uid, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
-            function completedQuery(qres){
-                var packed = {
-                    punch_id: qres.rows[0].punch_event_id,
-                };
-                result.setStatus(200);
-                result.setPayload(packed);
-                res.status(result.getStatus()).type('application/json').send(result.getPayload());
-                timer.endTimer(result);
+        function completedStatusQuery(qres){
+            var statusOK = 'OK';
+            if(qres.rowCount == 0){
+                statusOK = 'Cannot Start Break, Not Clocked In';
+            }else if(qres.rows[0].current_status == 'On Break'){
+                statusOK = 'Cannot Start Break, Currently On Break. End Break, Then Start Another';
+            }else if(qres.rows[0].current_status == 'Clocked Out'){
+                statusOK = 'Cannot Start Break, While Clocked Out';
+            }else{
+                statusOK = 'OK';
             }
+            
+            if(statusOK == 'OK'){
+                // Perform Clock In
+                var values = [uid, pgDate, pgTime, punchTypeCleaned, notes];
 
-            function failedQuery(failure){
-                console.log("Failure Called")
-                if(failure.error){
-                    result.setStatus(500);
-                    result.addError("An Error Has Occured E100");
-                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
-                    timer.endTimer(result);
-                }else{
-                    console.log(failure.result)
-                    result.setStatus(500);
-                    result.addError("An Error Has Occured E100");
+                db.clockBreak.start(pool, userID, values, completedQuery, failedQuery);
+
+                function completedQuery(qres){
+                    var packed = {
+                        punch_id: qres.rows[0].punch_event_id,
+                    };
+                    result.setStatus(200);
+                    result.setPayload(packed);
                     res.status(result.getStatus()).type('application/json').send(result.getPayload());
                     timer.endTimer(result);
                 }
-            }
-        }else{
-            result.setStatus(403);
-            result.addError(statusOK);
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result); 
-        }
-    }
 
-    function failedStatusQuery(failure){
-        console.log("Failure Called")
-        if(failure.error){
-            result.setStatus(500);
-            result.addError("An Error Has Occured E100");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result);
-        }else{
-            console.log(failure.result)
-            result.setStatus(500);
-            result.addError("An Error Has Occured E100");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result);
+                function failedQuery(failure){
+                    console.log("Failure Called")
+                    if(failure.error){
+                        result.setStatus(500);
+                        result.addError("An Error Has Occured E100");
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }else{
+                        console.log(failure.result)
+                        result.setStatus(500);
+                        result.addError("An Error Has Occured E100");
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }
+                }
+            }else{
+                result.setStatus(403);
+                result.addError(statusOK);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result); 
+            }
+        }
+
+        function failedStatusQuery(failure){
+            console.log("Failure Called")
+            if(failure.error){
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
         }
     }
 });
@@ -482,80 +609,121 @@ router.post('/break/end', function (req, res) {
     // Check if User Currently Clocked In
 
     var pgTimeStamp;
+    var pgDate;
+    var pgTime;
     if(_.has(body, 'eventDate') && _.has(body, 'entryTime') ){
         var d = new Date(body.eventDate + ' ' + body.entryTime);
-        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);  
+        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
     }else{
         var d = new Date();
-        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+        pgDate = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2);
+        pgTime = pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);
     }
 
-    db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
+    var uid;
+    if(_.has(body, 'userId')){
+        // Todo Validate Permissions On User
+        uid = body.userId;
+    }else{
+        // Default To Current User When None Is Given
+        uid = userID;
+    }
 
-    function completedStatusQuery(qres){
-        var statusOK = 'OK';
-        if(qres.rowCount == 0){
-            statusOK = 'Cannot End Break, Not Clocked In';
-        }else if(qres.rows[0].current_status == 'Back From Break'){
-            statusOK = 'Cannot End Break, Already Back From Break. Start A New Break, Then End It.';
-        }else if(qres.rows[0].current_status == 'Clocked Out'){
-            statusOK = 'Cannot End Break, While Clocked Out';
+    var notes;
+    if(_.has(body, 'notes')){
+        notes = body.notes;
+    }else{
+        notes = null;
+    }
+
+    var allowedPunchTypes = ["WORK","PTO","UPTO","ADMIN"];
+    var punchTypeCleaned;
+    if(_.has(body, 'punchType')){
+        if(allowedPunchTypes.includes(body.punchType)){
+            punchTypeCleaned = body.punchType;
         }else{
-            statusOK = 'OK';
+            result.addError("Malformed Request - punchType is invalid. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)"); 
         }
-        
-        if(statusOK == 'OK'){
-            // Perform Clock In
-            var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
+        punchTypeCleaned = body.notes;
+    }else{
+        result.addError("Malformed Request - Request Must Contain punchType in body. Allowed Values For punchType Are (WORK,PTO,UPTO,ADMIN)");
+    }
 
-            db.clockBreak.end(pool, userID, values, completedQuery, failedQuery);
+    if(result.hasErrors()){
+        result.setStatus(400);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result); 
+    }else{
+        db.clock.status(pool, userID, uid, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
-            function completedQuery(qres){
-                var packed = {
-                    punch_id: qres.rows[0].punch_event_id,
-                };
-                result.setStatus(200);
-                result.setPayload(packed);
-                res.status(result.getStatus()).type('application/json').send(result.getPayload());
-                timer.endTimer(result);
+        function completedStatusQuery(qres){
+            var statusOK = 'OK';
+            if(qres.rowCount == 0){
+                statusOK = 'Cannot End Break, Not Clocked In';
+            }else if(qres.rows[0].current_status == 'Back From Break'){
+                statusOK = 'Cannot End Break, Already Back From Break. Start A New Break, Then End It.';
+            }else if(qres.rows[0].current_status == 'Clocked Out'){
+                statusOK = 'Cannot End Break, While Clocked Out';
+            }else{
+                statusOK = 'OK';
             }
+            
+            if(statusOK == 'OK'){
+                // Perform Clock In
+                var values = [uid, pgDate, pgTime, punchTypeCleaned, notes];
 
-            function failedQuery(failure){
-                console.log("Failure Called")
-                if(failure.error){
-                    result.setStatus(500);
-                    result.addError("An Error Has Occured E100");
-                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
-                    timer.endTimer(result);
-                }else{
-                    console.log(failure.result)
-                    result.setStatus(500);
-                    result.addError("An Error Has Occured E100");
+                db.clockBreak.end(pool, userID, values, completedQuery, failedQuery);
+
+                function completedQuery(qres){
+                    var packed = {
+                        punch_id: qres.rows[0].punch_event_id,
+                    };
+                    result.setStatus(200);
+                    result.setPayload(packed);
                     res.status(result.getStatus()).type('application/json').send(result.getPayload());
                     timer.endTimer(result);
                 }
-            }
-        }else{
-            result.setStatus(403);
-            result.addError(statusOK);
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result); 
-        }
-    }
 
-    function failedStatusQuery(failure){
-        console.log("Failure Called")
-        if(failure.error){
-            result.setStatus(500);
-            result.addError("An Error Has Occured E100");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result);
-        }else{
-            console.log(failure.result)
-            result.setStatus(500);
-            result.addError("An Error Has Occured E100");
-            res.status(result.getStatus()).type('application/json').send(result.getPayload());
-            timer.endTimer(result);
+                function failedQuery(failure){
+                    console.log("Failure Called")
+                    if(failure.error){
+                        result.setStatus(500);
+                        result.addError("An Error Has Occured E100");
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }else{
+                        console.log(failure.result)
+                        result.setStatus(500);
+                        result.addError("An Error Has Occured E100");
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }
+                }
+            }else{
+                result.setStatus(403);
+                result.addError(statusOK);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result); 
+            }
+        }
+
+        function failedStatusQuery(failure){
+            console.log("Failure Called")
+            if(failure.error){
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
         }
     }
 });
