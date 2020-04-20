@@ -75,6 +75,13 @@ Then Switch To A Connection To PostgreSQL from the user `bontime_rest_api_data_u
 Then Run This Script
 
 ```sql
+-- PROCEDURE: Change PG Connection Info To use New User
+
+-- TODO: Somehow SETUP Email Account
+-- Also Require User Sets Up https://myaccount.google.com/lesssecureapps allow less secure apps
+
+
+
 -- Create User Table
 CREATE TABLE public.users
 (
@@ -969,49 +976,48 @@ GRANT EXECUTE ON FUNCTION public.break_out(uuid, date, time, punch_types, text) 
 
 -- Check Status of Employee
 CREATE OR REPLACE VIEW public.check_status AS
-WITH seek as (
-	SELECT
-		-- TZ OFFSET
-		-- ( to_timestamp(date_part('epoch'::text, timezone('utc'::text, current_setting('loc.seek_time')::TIMESTAMP )::TIMESTAMP)) at time zone 'utc')::TIMESTAMP as seek_tstamp,
-		-- ( to_timestamp(date_part('epoch'::text, timezone('utc'::text, current_setting('loc.seek_time')::TIMESTAMP )::TIMESTAMP)) at time zone 'utc')::DATE as seek_date,
-		-- date_part('epoch'::text, timezone('utc'::text, current_setting('loc.seek_time')::TIMESTAMP )::TIMESTAMP) as seek_epoch,
-		( to_timestamp(date_part('epoch'::text, current_setting('loc.seek_time')::TIMESTAMP)) at time zone 'utc')::TIMESTAMP as seek_tstamp,
-		( to_timestamp(date_part('epoch'::text, current_setting('loc.seek_time')::TIMESTAMP)) at time zone 'utc')::DATE as seek_date,
-		date_part('epoch'::text, current_setting('loc.seek_time')::TIMESTAMP) as seek_epoch
-), selected_punch as (
-	SELECT 
-		id, 
-		punch_type, 
-		timesheet_id,
-		event_date,
-		(to_timestamp(event_date) at time zone 'utc')::DATE as clock_day
-	FROM public.punches
-	WHERE (SELECT seek_date FROM seek) = (to_timestamp(event_date) at time zone 'utc')::DATE
-	AND user_id = CURRENT_SETTING('loc.seek_user')::UUID
-)
-SELECT 
-	p.id as punch_id, 
-	p.punch_type, 
-	p.timesheet_id, 
-	p.event_date,
-	p.clock_day,
-	pe.id as punch_event_id,
-	--pe.entry,
-	(to_timestamp(entry) at time zone 'utc') as clock_time,
-	pe.type,
-	((SELECT seek_tstamp FROM seek) - to_timestamp(entry) at time zone 'utc')::INTERVAL as for_interval,
-	CASE WHEN pe.type = 'BIN' THEN 'On Break' WHEN pe.type = 'BOUT' THEN 'Back From Break' WHEN pe.type = 'IN' THEN 'Clocked In' ELSE 'Clocked Out' END as current_status
-FROM selected_punch as p
-LEFT JOIN public.punch_events as pe ON pe.punch_id = p.id
-WHERE (SELECT seek_tstamp FROM seek) >= (to_timestamp(entry) at time zone 'utc');
+ WITH seek AS (
+         SELECT timezone('utc'::text, to_timestamp(date_part('epoch'::text, current_setting('loc.seek_time'::text)::timestamp without time zone))) AS seek_tstamp,
+            timezone('utc'::text, to_timestamp(date_part('epoch'::text, current_setting('loc.seek_time'::text)::timestamp without time zone)))::date AS seek_date,
+            date_part('epoch'::text, current_setting('loc.seek_time'::text)::timestamp without time zone) AS seek_epoch
+        ), selected_punch AS (
+         SELECT punches.id,
+            punches.punch_type,
+            punches.timesheet_id,
+            punches.event_date,
+            timezone('utc'::text, to_timestamp(punches.event_date))::date AS clock_day
+           FROM punches
+          WHERE (( SELECT seek.seek_date
+                   FROM seek)) = timezone('utc'::text, to_timestamp(punches.event_date))::date AND punches.user_id = current_setting('loc.seek_user'::text)::uuid
+        )
+ SELECT p.id AS punch_id,
+    p.punch_type,
+    p.timesheet_id,
+    p.event_date,
+    p.clock_day,
+    pe.id AS punch_event_id,
+	TO_CHAR(timezone('utc'::text, to_timestamp(pe.entry))::TIMESTAMP, 'hh12:mi AM')::TEXT  AS clock_time,
+    pe.type,
+    (( SELECT seek.seek_tstamp
+           FROM seek)) - timezone('utc'::text, to_timestamp(pe.entry)) AS for_interval,
+        CASE
+            WHEN pe.type = 'BIN'::punch_event_type THEN 'On Break'::text
+            WHEN pe.type = 'BOUT'::punch_event_type THEN 'Back From Break'::text
+            WHEN pe.type = 'IN'::punch_event_type THEN 'Clocked In'::text
+            ELSE 'Clocked Out'::text
+        END AS current_status
+   FROM selected_punch p
+     LEFT JOIN punch_events pe ON pe.punch_id = p.id
+  WHERE (( SELECT seek.seek_tstamp
+           FROM seek)) >= timezone('utc'::text, to_timestamp(pe.entry))
+  ORDER BY pe.entry DESC
+ LIMIT 1;
 
-ALTER TABLE public.check_status OWNER TO "bontime_rest_api_data_user";
+ALTER TABLE public.check_status
+    OWNER TO bontime_rest_api_data_user;
 
-GRANT ALL ON TABLE public.check_status TO "bontime_users";
-
--- Add Kisok Pin Code To Auth Table
-ALTER TABLE public.auth ADD COLUMN kiosk_pin bigint DEFAULT NULL;
-ALTER TABLE public.auth ADD CONSTRAINT kiosk_pin_must_be_unique UNIQUE (kiosk_pin);
+GRANT ALL ON TABLE public.check_status TO bontime_users;
+GRANT ALL ON TABLE public.check_status TO bontime_rest_api_data_user;
 
 -- Function To Create Unique Kiosk PIN Codes
 -- 8 digit pin codes
@@ -1171,7 +1177,453 @@ $BODY$;
 ALTER FUNCTION public.verify_email(verification_id uuid) OWNER TO "bontime_rest_api_data_user";
 GRANT EXECUTE ON FUNCTION public.verify_email(verification_id uuid) TO "bontime_users";
 
+-- ADD AUTH FOR SUPERADMIN
 INSERT INTO public.auth(created_by, created_on, user_id, expires, pass) VALUES ('70c505eb-6671-47e6-a8a7-9d7d7fccf2b6', extract(epoch from now() at time zone 'utc'), '70c505eb-6671-47e6-a8a7-9d7d7fccf2b6', extract(epoch from (now() + interval '5 years') at time zone 'utc'), '$2a$10$90WTJvA0P5e.y55KVMtp9ushL/e8WzDq78mIpUhIRoqsTFNd5zIbm');
+
+-- Function To Report Punches For Single User Over Specified Time Period
+CREATE OR REPLACE FUNCTION public.report_punches_for_single_user(seek_user_id uuid, start_date date, end_date date)
+    RETURNS TABLE(clock_day date, user_id uuid, notice text, clock_type punch_types, start_time text, end_time text, raw_minutes int, minutes_on_break int, billable_minutes int)
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE 
+	ROWS 1000
+AS $BODY$
+DECLARE
+	start_epoch double precision;
+	end_epoch double precision;
+	cur_day record;
+	_c text;
+BEGIN
+	start_epoch := extract(epoch from start_date at time zone 'utc');
+	end_epoch := extract(epoch from end_date at time zone 'utc');
+	
+	-- Ensure Start Date <=  End Date
+	IF start_date > end_date THEN
+		RAISE EXCEPTION 'Start Date Cannot Be Greater Than End Date';
+	ELSE
+		RAISE NOTICE 'Start Date: % < End Date: %', start_date, end_date;
+	END IF;
+	
+	-- Create Day Based Table
+	DROP TABLE IF EXISTS temp_punches_for_time_period;
+	
+	CREATE TEMPORARY TABLE temp_punches_for_time_period AS
+		SELECT 
+			p.id, 
+			p.user_id, 
+			to_timestamp(p.event_date)::TIMESTAMP, 
+			(SELECT array_agg(pe.id) as event_ids FROM public.punch_events as pe WHERE pe.punch_id = p.id) 
+		FROM public.punches as p
+			WHERE to_timestamp(p.event_date)::DATE >= start_date
+			AND to_timestamp(p.event_date)::DATE <= end_date
+			AND p.user_id = seek_user_id;
+	
+	-- Create Table For Results
+	DROP TABLE IF EXISTS temp_report_single_user_result_table;
+	
+	CREATE TEMPORARY TABLE temp_report_single_user_result_table (
+		clock_day date, 
+		user_id uuid, 
+		notice text, 
+		clock_type punch_types, 
+		start_time text, 
+		end_time text, 
+		tmp_raw_minutes int, 
+		tmp_minutes_on_break int, 
+		tmp_billable_minutes int
+	);
+		
+	
+	-- Perform Action Per Day
+	FOR cur_day IN SELECT * FROM temp_punches_for_time_period
+	LOOP
+		RAISE NOTICE 'Current Punch Record: %', cur_day;
+		WITH listing as (
+			SELECT pe.id, pe.entry, to_timestamp(pe.entry) at time zone 'utc' as entry_timestamp, pe.type, pe.notes 
+			FROM punch_events as pe
+			WHERE pe.id IN (SELECT UNNEST(cur_day.event_ids))
+			ORDER BY entry ASC
+		),in_list as (
+			SELECT row_number() over (ORDER BY entry ASC) as rownum, lst.id, lst.entry, lst.entry_timestamp, lst.type, lst.notes
+			FROM listing as lst
+			WHERE lst.type = 'IN'
+			ORDER BY entry ASC
+		), out_list as (
+			SELECT row_number() over (ORDER BY entry ASC) as rownum, lst.id, lst.entry, lst.entry_timestamp, lst.type, lst.notes
+			FROM listing as lst
+			WHERE lst.type = 'OUT'
+			ORDER BY entry ASC
+		), break_start_list AS (
+			SELECT row_number() over (ORDER BY entry ASC) as rownum, lst.id, lst.entry, lst.entry_timestamp, lst.type, lst.notes
+			FROM listing as lst
+			WHERE lst.type = 'BIN'
+			ORDER BY entry ASC
+		), break_end_list AS (
+			SELECT row_number() over (ORDER BY entry ASC) as rownum, lst.id, lst.entry, lst.entry_timestamp, lst.type, lst.notes
+			FROM listing as lst
+			WHERE lst.type = 'BOUT'
+			ORDER BY entry ASC
+		), list_in_out_paired AS (
+			SELECT 
+				ci.rownum, 
+				ci.id as clock_in_event_id, 
+				ci.entry as clock_in_entry,
+				ci.entry_timestamp as clock_in_entry_timestamp,
+				ci.notes as clock_in_notes,
+				co.id as clock_out_event_id, 
+				co.entry as clock_out_entry,
+				co.entry_timestamp as clock_out_entry_timestamp,
+				co.notes as clock_out_notes,
+				EXTRACT(EPOCH FROM (co.entry_timestamp - ci.entry_timestamp)::INTERVAL)/60 as raw_clock_minutes
+			FROM in_list as ci
+			LEFT JOIN out_list as co ON ci.rownum = co.rownum
+		), list_of_breaks AS (
+			SELECT 
+				bsl.rownum, 
+				bsl.id as break_start_event_id, 
+				bsl.entry as break_start_entry,
+				bsl.entry_timestamp as break_start_entry_timestamp,
+				bsl.notes as break_start_notes,
+				bel.id as break_end_event_id, 
+				bel.entry as break_end_entry,
+				bel.entry_timestamp as break_end_entry_timestamp,
+				bel.notes as break_end_notes,
+				EXTRACT(EPOCH FROM (bel.entry_timestamp - bsl.entry_timestamp)::INTERVAL)/60 as minutes_on_break
+			FROM break_start_list as bsl
+			LEFT JOIN break_end_list as bel ON bsl.rownum = bel.rownum
+		), minute_totals_per_row AS (
+			SELECT
+				rownum, 
+				CASE WHEN rownum > 0 THEN true ELSE false END AS clock_exists,
+				clock_in_event_id,
+				clock_out_event_id,
+				raw_clock_minutes,
+				(SELECT CASE WHEN COUNT(rownum) > 0 THEN true ELSE false END FROM list_of_breaks as lob WHERE lob.break_start_entry > clock_in_entry AND lob.break_end_entry < clock_out_entry) as break_exists,
+				(SELECT SUM(lob.minutes_on_break) FROM list_of_breaks as lob WHERE lob.break_start_entry > clock_in_entry AND lob.break_end_entry < clock_out_entry) as total_minutes_on_break
+			FROM list_in_out_paired
+		), billable AS (
+			SELECT 
+				cur_day.id as punch_id,
+				rownum,
+				clock_exists,
+				break_exists,
+				CASE WHEN clock_exists AND raw_clock_minutes is null THEN true ELSE false END as clock_incomplete,
+				CASE WHEN break_exists AND total_minutes_on_break is null THEN true ELSE false END as break_incomplete,
+				clock_in_event_id,
+				clock_out_event_id,
+				raw_clock_minutes,
+				total_minutes_on_break,
+				CASE 
+					WHEN break_exists and NOT(CASE WHEN break_exists AND total_minutes_on_break is null THEN true ELSE false END) THEN 
+						(raw_clock_minutes - total_minutes_on_break)
+					ELSE
+						raw_clock_minutes
+				END as billable_minutes
+			FROM minute_totals_per_row
+		), formatted_list_of_breaks AS (
+			SELECT
+				break_start_entry,
+				break_end_entry,
+				NULL::DATE as clock_day,
+				p.user_id,
+				'Break Child' as notice,
+				NULL::punch_types  as clock_type,
+				TO_CHAR(timezone('utc'::text, to_timestamp(break_start_entry))::TIMESTAMP, 'hh12:mi AM') as start_time,
+				TO_CHAR(timezone('utc'::text, to_timestamp(break_end_entry))::TIMESTAMP, 'hh12:mi AM') as end_time,
+				NULL::INT as raw_minutes,
+				ROUND(b.minutes_on_break)::INT as minutes_on_break,
+				NULL::INT as billable_minutes
+			FROM list_of_breaks as b
+			LEFT JOIN public.punch_events as pe ON pe.id = b.break_start_event_id
+			LEFT JOIN public.punches as p ON p.id = pe.punch_id
+		), formatted_clock_event_list as (
+			SELECT
+				ci.entry as clock_in_entry,
+				co.entry as clock_out_entry,
+				to_timestamp(p.event_date)::DATE as clock_day,
+				p.user_id,
+				-- TODO: Add Notice Section TO Alert If Break, Or Clock In Clock Out Incomplete
+				CASE 
+					WHEN clock_incomplete AND break_incomplete THEN 
+						'Out On Break'
+					WHEN clock_incomplete THEN
+						'Pending Clock Out'
+					ELSE
+						''
+				END as notice,
+				p.punch_type as clock_type,
+				--timezone('utc'::text, to_timestamp(ci.entry))::TIMESTAMP as start_tstamp,
+				TO_CHAR(timezone('utc'::text, to_timestamp(ci.entry))::TIMESTAMP, 'hh12:mi AM') as start_time,
+				--timezone('utc'::text, to_timestamp(co.entry))::TIMESTAMP as end_tstamp,
+				TO_CHAR(timezone('utc'::text, to_timestamp(co.entry)), 'hh:mi AM') as end_time,
+				ROUND(b.raw_clock_minutes)::INT as raw_minutes,
+				ROUND(b.total_minutes_on_break)::INT as minutes_on_break,
+				ROUND(b.billable_minutes)::INT as billable_minutes
+			FROM billable as b
+			LEFT JOIN public.punches as p ON p.id = b.punch_id
+			LEFT JOIN public.punch_events as ci ON ci.id = b.clock_in_event_id
+			LEFT JOIN public.punch_events as co ON co.id = b.clock_out_event_id	
+		), all_together_now AS (
+			SELECT * FROM formatted_clock_event_list
+			UNION
+			SELECT * FROM formatted_list_of_breaks
+			ORDER BY clock_in_entry ASC
+		)
+		INSERT INTO temp_report_single_user_result_table(clock_day, user_id, notice, clock_type, start_time, end_time, tmp_raw_minutes, tmp_minutes_on_break, tmp_billable_minutes)
+			SELECT atn.clock_day, atn.user_id, atn.notice, atn.clock_type, atn.start_time, atn.end_time, atn.raw_minutes, atn.minutes_on_break, atn.billable_minutes FROM all_together_now as atn;
+	END LOOP;
+	
+	RETURN QUERY EXECUTE 'SELECT trep.clock_day, trep.user_id, trep.notice, trep.clock_type, trep.start_time, trep.end_time, trep.tmp_raw_minutes as raw_minutes, trep.tmp_minutes_on_break as minutes_on_break, trep.tmp_billable_minutes as billable_minutes FROM temp_report_single_user_result_table as trep';
+
+EXCEPTION
+	WHEN data_exception THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_single_user FAILED] - UDF ERROR [DATA EXCEPTION] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+	WHEN unique_violation THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_single_user FAILED] - UDF ERROR [UNIQUE] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+	WHEN OTHERS THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_single_user FAILED] - UDF ERROR [OTHER] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+END
+$BODY$;
+
+ALTER FUNCTION public.report_punches_for_single_user(seek_user_id uuid, start_date date, end_date date) OWNER TO "bontime_rest_api_data_user";
+GRANT EXECUTE ON FUNCTION public.report_punches_for_single_user(seek_user_id uuid, start_date date, end_date date) TO "bontime_users";
+-- Report Punches For List of Users
+CREATE OR REPLACE FUNCTION public.report_punches_for_list_of_users(seek_user_ids uuid[], start_date date, end_date date)
+    RETURNS TABLE(clock_day date, user_id uuid, notice text, clock_type punch_types, start_time text, end_time text, raw_minutes int, minutes_on_break int, billable_minutes int)
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE 
+	ROWS 1000
+AS $BODY$
+DECLARE
+	start_epoch double precision;
+	end_epoch double precision;
+	cur_usr uuid;
+	_c text;
+BEGIN
+
+	-- Ensure Start Date <=  End Date
+	IF start_date > end_date THEN
+		RAISE EXCEPTION 'Start Date Cannot Be Greater Than End Date';
+	ELSE
+		RAISE NOTICE 'Start Date: % < End Date: %', start_date, end_date;
+	END IF;
+	
+	DROP TABLE IF EXISTS temp_report_multi_user_result_table;
+	
+	CREATE TEMPORARY TABLE temp_report_multi_user_result_table (
+		clock_day date, 
+		user_id uuid, 
+		notice text, 
+		clock_type punch_types, 
+		start_time text, 
+		end_time text, 
+		tmp_raw_minutes int, 
+		tmp_minutes_on_break int, 
+		tmp_billable_minutes int
+	);
+	-- Perform Action Per Day
+	FOR cur_usr IN SELECT UNNEST(seek_user_ids)
+	LOOP
+		RAISE NOTICE 'Current Records For: %', cur_usr;
+		INSERT INTO temp_report_multi_user_result_table(clock_day, user_id, notice, clock_type, start_time, end_time, tmp_raw_minutes, tmp_minutes_on_break, tmp_billable_minutes)
+			SELECT * FROM public.report_punches_for_single_user(cur_usr::UUID, start_date::DATE, end_date::DATE);
+	END LOOP;
+	
+	RETURN QUERY EXECUTE 'SELECT trep.clock_day, trep.user_id, trep.notice, trep.clock_type, trep.start_time, trep.end_time, trep.tmp_raw_minutes as raw_minutes, trep.tmp_minutes_on_break as minutes_on_break, trep.tmp_billable_minutes as billable_minutes FROM temp_report_multi_user_result_table as trep';
+
+EXCEPTION
+	WHEN data_exception THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_list_of_users FAILED] - UDF ERROR [DATA EXCEPTION] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+	WHEN unique_violation THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_list_of_users FAILED] - UDF ERROR [UNIQUE] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+	WHEN OTHERS THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_list_of_users FAILED] - UDF ERROR [OTHER] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+END
+$BODY$;
+
+ALTER FUNCTION public.report_punches_for_list_of_users(seek_user_ids uuid[], start_date date, end_date date) OWNER TO "bontime_rest_api_data_user";
+GRANT EXECUTE ON FUNCTION public.report_punches_for_list_of_users(seek_user_ids uuid[], start_date date, end_date date) TO "bontime_users";
+
+-- Report Punches For All users
+CREATE OR REPLACE FUNCTION public.report_punches_for_all_users(start_date date, end_date date)
+    RETURNS TABLE(clock_day date, user_id uuid, notice text, clock_type punch_types, start_time text, end_time text, raw_minutes int, minutes_on_break int, billable_minutes int)
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE 
+	ROWS 1000
+AS $BODY$
+DECLARE
+	start_epoch double precision;
+	end_epoch double precision;
+	cur_usr uuid;
+	_c text;
+BEGIN
+
+	-- Ensure Start Date <=  End Date
+	IF start_date > end_date THEN
+		RAISE EXCEPTION 'Start Date Cannot Be Greater Than End Date';
+	ELSE
+		RAISE NOTICE 'Start Date: % < End Date: %', start_date, end_date;
+	END IF;
+	
+	DROP TABLE IF EXISTS temp_report_multi_user_result_table;
+	
+	CREATE TEMPORARY TABLE temp_report_multi_user_result_table (
+		clock_day date, 
+		user_id uuid, 
+		notice text, 
+		clock_type punch_types, 
+		start_time text, 
+		end_time text, 
+		tmp_raw_minutes int, 
+		tmp_minutes_on_break int, 
+		tmp_billable_minutes int
+	);
+	-- Perform Action Per Day
+	FOR cur_usr IN SELECT id FROM public.users
+	LOOP
+		RAISE NOTICE 'Current Records For: %', cur_usr;
+		INSERT INTO temp_report_multi_user_result_table(clock_day, user_id, notice, clock_type, start_time, end_time, tmp_raw_minutes, tmp_minutes_on_break, tmp_billable_minutes)
+			SELECT * FROM public.report_punches_for_single_user(cur_usr::UUID, start_date::DATE, end_date::DATE);
+	END LOOP;
+	
+	RETURN QUERY EXECUTE 'SELECT trep.clock_day, trep.user_id, trep.notice, trep.clock_type, trep.start_time, trep.end_time, trep.tmp_raw_minutes as raw_minutes, trep.tmp_minutes_on_break as minutes_on_break, trep.tmp_billable_minutes as billable_minutes FROM temp_report_multi_user_result_table as trep';
+
+EXCEPTION
+	WHEN data_exception THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_all_users FAILED] - UDF ERROR [DATA EXCEPTION] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+	WHEN unique_violation THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_all_users FAILED] - UDF ERROR [UNIQUE] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+	WHEN OTHERS THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_all_users FAILED] - UDF ERROR [OTHER] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL::DATE as clock_day, NULL::UUID as user_id, NULL::TEXT as notice, NULL as clock_type, NULL::TEXT as start_time, NULL::TEXT as end_time, NULL::INT as raw_minutes, NULL::INT as minutes_on_break, NULL::INT as billable_minutes';
+END
+$BODY$;
+
+ALTER FUNCTION public.report_punches_for_all_users(start_date date, end_date date) OWNER TO "bontime_rest_api_data_user";
+GRANT EXECUTE ON FUNCTION public.report_punches_for_all_users(start_date date, end_date date) TO "bontime_users";
+
+-- Function To Fetch Status For Every User
+CREATE OR REPLACE FUNCTION public.get_all_user_statuses()
+    RETURNS TABLE(
+		punch_id uuid, 
+	  	punch_type punch_types, 
+		timesheet_id uuid, 
+		event_date double precision, 
+		clock_day date, 
+		punch_event_id uuid, 
+		clock_time text, 
+		type punch_event_type, 
+		for_interval interval,
+		current_status text
+				 )
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE 
+	ROWS 1000
+AS $BODY$
+DECLARE
+	current_epoch double precision;
+	end_epoch double precision;
+	cur_usr uuid;
+	_c text;
+BEGIN
+	-- Ensure Start Date <=  End Date
+	DROP TABLE IF EXISTS tmp_status_all_users;
+	
+	CREATE TEMPORARY TABLE tmp_status_all_users(
+		punch_id uuid, 
+	  	punch_type punch_types, 
+		timesheet_id uuid, 
+		event_date double precision, 
+		clock_day date, 
+		punch_event_id uuid, 
+		clock_time text, 
+		type punch_event_type, 
+		for_interval interval,
+		current_status text
+	);
+	 
+	 
+	-- Perform Action Per Day
+	FOR cur_usr IN SELECT id FROM public.users
+	LOOP
+		WITH seek AS (
+			 SELECT timezone('utc'::text, to_timestamp(date_part('epoch'::text, current_setting('loc.seek_time'::text)::timestamp without time zone))) AS seek_tstamp,
+				timezone('utc'::text, to_timestamp(date_part('epoch'::text, current_setting('loc.seek_time'::text)::timestamp without time zone)))::date AS seek_date,
+				date_part('epoch'::text, current_setting('loc.seek_time'::text)::timestamp without time zone) AS seek_epoch
+		), selected_punch AS (
+			 SELECT punches.id,
+				punches.punch_type,
+				punches.timesheet_id,
+				punches.event_date,
+				timezone('utc'::text, to_timestamp(punches.event_date))::date AS clock_day
+			   FROM punches
+			  WHERE (( SELECT seek.seek_date FROM seek)) = timezone('utc'::text, to_timestamp(punches.event_date))::date 
+				AND punches.user_id = cur_usr::uuid
+		)
+		INSERT INTO tmp_status_all_users(punch_id, punch_type, timesheet_id, event_date, clock_day, punch_event_id, clock_time, type, for_interval, current_status)
+			 SELECT p.id AS punch_id,
+				p.punch_type,
+				p.timesheet_id,
+				p.event_date,
+				p.clock_day,
+				pe.id AS punch_event_id,
+				TO_CHAR(timezone('utc'::text, to_timestamp(pe.entry))::TIMESTAMP, 'hh12:mi AM')::TEXT  AS clock_time,
+				pe.type,
+				(( SELECT seek.seek_tstamp
+					   FROM seek)) - timezone('utc'::text, to_timestamp(pe.entry)) AS for_interval,
+					CASE
+						WHEN pe.type = 'BIN'::punch_event_type THEN 'On Break'::text
+						WHEN pe.type = 'BOUT'::punch_event_type THEN 'Back From Break'::text
+						WHEN pe.type = 'IN'::punch_event_type THEN 'Clocked In'::text
+						ELSE 'Clocked Out'::text
+					END AS current_status
+			   FROM selected_punch p
+				 LEFT JOIN punch_events pe ON pe.punch_id = p.id
+			  WHERE (( SELECT seek.seek_tstamp FROM seek)) >= timezone('utc'::text, to_timestamp(pe.entry))
+			  ORDER BY pe.entry DESC
+			 LIMIT 1;
+	END LOOP;
+	
+	RETURN QUERY EXECUTE 'SELECT trep.punch_id, trep.punch_type, trep.timesheet_id, trep.event_date, trep.clock_day, trep.punch_event_id, trep.clock_time, trep.type, trep.for_interval, trep.current_status FROM tmp_status_all_users as trep';
+
+EXCEPTION
+	WHEN data_exception THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[report_punches_for_all_users FAILED] - UDF ERROR [DATA EXCEPTION] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL as punch_id, NULL as punch_type, NULL as timesheet_id, NULL as event_date, NULL as clock_day, NULL as punch_event_id, NULL as clock_time, NULL as type, NULL as for_interval, NULL as current_status';
+	WHEN unique_violation THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[get_all_user_statuses FAILED] - UDF ERROR [UNIQUE] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL as punch_id, NULL as punch_type, NULL as timesheet_id, NULL as event_date, NULL as clock_day, NULL as punch_event_id, NULL as clock_time, NULL as type, NULL as for_interval, NULL as current_status';
+	WHEN OTHERS THEN
+		GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+		RAISE EXCEPTION '[get_all_user_statuses FAILED] - UDF ERROR [OTHER] - SQLSTATE: %, SQLERRM: %, CONTEXT: >> % <<',SQLSTATE,SQLERRM,_c;
+		RETURN QUERY EXECUTE 'SELECT NULL as punch_id, NULL as punch_type, NULL as timesheet_id, NULL as event_date, NULL as clock_day, NULL as punch_event_id, NULL as clock_time, NULL as type, NULL as for_interval, NULL as current_status';
+END
+$BODY$;
+
+ALTER FUNCTION public.get_all_user_statuses() OWNER TO "bontime_rest_api_data_user";
+GRANT EXECUTE ON FUNCTION public.get_all_user_statuses() TO "bontime_users";
 ```
 
 Explore The Database, Its Up And Running

@@ -86,7 +86,14 @@ const clock = {
     status(pool, userID, lookup_user_id, pg_timestamp, successCallback, failureCallback){
         const query = {
             setRole: 'SET LOCAL loc.seek_time = \'' + pg_timestamp + '\'; SET LOCAL loc.seek_user = \'' + lookup_user_id + '\';SET ROLE \'' + userID + '\'',
-            text: 'SELECT * FROM check_status'
+            text: 'SELECT punch_id, punch_type, timesheet_id, event_date, clock_day::TEXT, punch_event_id, clock_time::TEXT, type, for_interval, current_status FROM check_status'
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
+    allUserStatuses(pool, userID, pg_timestamp, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET LOCAL loc.seek_time = \'' + pg_timestamp + '\'; SET ROLE \'' + userID + '\'',
+            text: 'SELECT aus.punch_id, u.id as user_id, CONCAT(u.first_name, \' \', u.last_name) as user_full_name, aus.punch_type, aus.timesheet_id, aus.event_date, aus.clock_day::TEXT, aus.punch_event_id, aus.clock_time::TEXT, aus.type, aus.for_interval, aus.current_status FROM public.get_all_user_statuses() as aus LEFT JOIN public.punches as p ON p.id = aus.punch_id LEFT JOIN public.users as u ON u.id = p.user_id'
         };
         performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
     },
@@ -181,6 +188,27 @@ const user = {
     },    
 };
 
+const reporting = {
+    multi(pool, userID, values, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET ROLE \'' + userID + '\'',
+            text: 'WITH report_punches as ( SELECT * FROM public.report_punches_for_list_of_users($1::UUID[], $2::DATE, $3::DATE) as rp) SELECT rp.clock_day::TEXT,rp.user_id,CONCAT(usr.first_name, \' \', usr.last_name) as user_full_name,rp.notice,rp.clock_type,rp.start_time,rp.end_time,rp.raw_minutes,rp.minutes_on_break,rp.billable_minutes FROM report_punches as rp LEFT JOIN public.users as usr ON usr.id = rp.user_id',
+            // array of user_ids, start_date, end_date
+            values: values
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
+    all(pool, userID, values, successCallback, failureCallback){
+        const query = {
+            setRole: 'SET ROLE \'' + userID + '\'',
+            text: 'WITH report_punches as ( SELECT * FROM public.report_punches_for_all_users($1::DATE, $2::DATE) as rp) SELECT rp.clock_day::TEXT,rp.user_id,CONCAT(usr.first_name, \' \', usr.last_name) as user_full_name,rp.notice,rp.clock_type,rp.start_time,rp.end_time,rp.raw_minutes,rp.minutes_on_break,rp.billable_minutes FROM report_punches as rp LEFT JOIN public.users as usr ON usr.id = rp.user_id',
+            // start_date, end_date
+            values: values
+        };
+        performQueryAsRole_withValues(pool, query, successCallback, failureCallback);
+    },
+}
+
 
 // Actual Query Function
 function performQueryAsRole_withValues(pool, query, successCallback, failureCallback){
@@ -241,7 +269,6 @@ function performQueryAsRole_withValues(pool, query, successCallback, failureCall
         })
     });
 }
-
 
 function performQueryAsRole_noValues(pool, query, successCallback, failureCallback){
     pool.connect((err, client, success, failure) => {
@@ -405,4 +432,5 @@ module.exports = {
     clockBreak,
     permissions,
     user,
+    reporting,
 };

@@ -169,7 +169,7 @@ router.post('/clock/in', function (req, res) {
         var d = new Date();
         var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
     }
-
+    console.log(pgTimeStamp);
     // Check if User Currently Clocked In
     db.clock.status(pool, userID, body.userId, pgTimeStamp, completedStatusQuery, failedStatusQuery);
 
@@ -401,7 +401,7 @@ router.post('/break/start', function (req, res) {
             // Perform Clock In
             var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
 
-            db.break.in(pool, userID, values, completedQuery, failedQuery);
+            db.clockBreak.start(pool, userID, values, completedQuery, failedQuery);
 
             function completedQuery(qres){
                 var packed = {
@@ -508,7 +508,7 @@ router.post('/break/end', function (req, res) {
             // Perform Clock In
             var values = [body.userId, body.eventDate, body.entryTime, body.punchType, body.notes];
 
-            db.break.out(pool, userID, values, completedQuery, failedQuery);
+            db.clockBreak.end(pool, userID, values, completedQuery, failedQuery);
 
             function completedQuery(qres){
                 var packed = {
@@ -605,6 +605,80 @@ router.post('/clock/status', function (req, res) {
         qres.rows.forEach(r => {
             recs.push({
                 punchID: r.punch_id,
+                punchType: r.punchType,
+                punchDay: r.clock_day,
+                punchEventID: r.punch_event_id,
+                punchEventTimestamp: r.clock_time,
+                currentStatus: r.current_status,
+                currentTimer: r.for_interval
+            });
+        });
+        var packed = {
+            records: recs
+        };
+        result.setStatus(200);
+        result.setPayload(packed);
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+
+    function failedQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+});
+
+// Check Clock Status For All Users
+router.post('/clock/status/all', function (req, res) {
+
+    // get timer and result builder
+    var {timer, result} = initializeRoute(req);
+
+    log.info("Searching...")
+    console.log(req.params)
+
+    // get user id
+    var userID = req.user.id;
+
+    // get json body
+    var body = req.body;
+
+    // TODO: Validation
+
+    // TODO: Permissions Checking
+
+    // Assumes The Following Exist In Body
+    // seekTimestamp - Optional - Assumes Now if Not Included FORMAT: 'YYYY-MM-DD HH:MM:SS' OR NULL, NULL will assume that status is for current time
+
+
+    var pgTimeStamp;
+    if(_.has(body, 'seekTimestamp')){
+        pgTimeStamp = body.seekTimestamp;
+    }else{
+        var d = new Date();
+        var pgTimeStamp = d.getFullYear() + '-' + pad( (d.getMonth()+1), 2 ) + '-' + pad( (d.getDate()), 2) + ' ' +  pad( (d.getHours()), 2) + ':' +  pad( (d.getMinutes()), 2) + ':' +  pad( (d.getSeconds()), 2);   
+    }
+
+    db.clock.allUserStatuses(pool, userID, pgTimeStamp, completedQuery, failedQuery);
+
+    function completedQuery(qres){
+        var recs = [];
+        qres.rows.forEach(r => {
+            recs.push({
+                punchID: r.punch_id,
+                userID: r.user_id,
+                userName: r.user_full_name,
                 punchType: r.punchType,
                 punchDay: r.clock_day,
                 punchEventID: r.punch_event_id,
@@ -774,8 +848,6 @@ router.post('/user', function (req, res) {
     // Hash Password and Create User Auth With PIN Generation
     // Return PinCode and Generated User
     // Sends Verification Email
-
-    
 
     // Bcrypt the Password
     bcrypt.hash( body.password, 10 ).then( async (hash) => {
@@ -1093,34 +1165,8 @@ router.get('/user/list', function (req, res) {
     }
 });
 
-
-
-
-// Get all timesheets
-router.get('/timesheets', function (req, res) {
-    // Get Timer and Result Builder
-    var {timer, result} = initializeRoute(req);
-
-    var userID = req.user.id;
-
-    var page = 0;
-    var perPage = 24;
-
-    if(_.has(req.query, 'perpage')){
-        perPage = parseInt(req.query.perpage);
-    }
-
-    if(_.has(req.query, 'page')){
-        page = parseInt(req.query.page);
-    }
-
-    var meta = {};
-    
-});
-
-
-// Searching through Timesheets
-router.post('/timesheets/search', function (req, res) {
+// Report For Date, On User Or List of Users
+router.post('/report', function (req, res) {
 
     // get timer and result builder
     var {timer, result} = initializeRoute(req);
@@ -1134,71 +1180,521 @@ router.post('/timesheets/search', function (req, res) {
     // get json body
     var body = req.body;
 
-});
+    // Body Expects
+    // startDate - FORMATTED YYYY-MM-DD
+    // endDate - FORMATTED YYYY-MM-DD
+    // userID - single user_id, or array of user_ids, if empty, assumes current user
 
-// Get Single Timesheet
-router.get('/timesheets/:id', function (req, res) {
-    // Get Timer and Result Builder
-    var {timer, result} = initializeRoute(req);
-
-    var userID = req.user.id;
-
-    // Validation of Request id parameter before use
-    if ( !(_.has(req.params, "id")) || req.params.id == null || req.params.id == undefined){
-
+    // Start Validation
+    var cleaned = {
+        startDate: null,
+        endDate: null,
+        userIds: null,
+        uidIsArray: false
+    }
+    const correctDateFormat = /^\d{4}-(1|2|3|4|5|6|7|8|9|10|11|12|01|02|03|04|05|06|07|08|09)-\d{1,2}$/;
+    // Check Start Date
+    if(_.has(body, 'startDate')){
+        // Must Match Regex Definition of Formatted Date
+        if(correctDateFormat.test(body.startDate)){
+            cleaned.startDate = body.startDate;
+        }else{
+            result.setStatus(400);
+            result.addError("startDate Is Malformed - startDate Must Be Formatted As YYYY-MM-DD");
+        }
+    }else{
         result.setStatus(400);
-        result.addError("Request Requires Parameter id to be filled");
-        result.setPayload({});
-        res.status(result.getStatus()).type('application/json').send(result.getPayload());
-        timer.endTimer(result);
-        return;
+        result.addError("Request Missing Required Key - Body Must Contain startDate (Formatted As YYYY-MM-DD)");
+    }
+    // Check End Date
+    if(_.has(body, 'endDate')){
+        // Must Match Regex Definition of Formatted Date
+        if(correctDateFormat.test(body.endDate)){
+            cleaned.endDate = body.endDate;
+        }else{
+            console.log(body.endDate)
+            result.setStatus(400);
+            result.addError("endDate Is Malformed - endDate Must Be Formatted As YYYY-MM-DD");
+        }
+    }else{
+        result.setStatus(400);
+        result.addError("Request Missing Required Key - Body Must Contain endDate (Formatted As YYYY-MM-DD)");
+    }
+    // Check If userID
+    if(_.has(body, 'userID')){
+        // Check if array
+        if(_.isArray(body.userID)){
+            // This is an array of ids
+            // TODO: check each ID to validate that they are real users
+            cleaned.userIds = body.userID;
+            cleaned.uidIsArray = true;
+        }else{
+            // TODO: validate user id is real user id
+            cleaned.userIds = body.userID;
+            cleaned.uidIsArray = false;
+        }
+    }else{
+        // Assume User Is Asking About Themselves
+        cleaned.userIds = userID;
+        cleaned.uidIsArray = false;
     }
 
-});
+    // Check If Result Has Errors
+    if(!result.hasErrors()){
+        // Build Required Values Array
+        var values = [];
+        if(cleaned.uidIsArray){
+            values = ['{' + cleaned.userIds.join(',') + '}', cleaned.startDate, cleaned.endDate];
+        }else{
+            values = ['{' + cleaned.userIds + '}', cleaned.startDate, cleaned.endDate];
+        }
 
-// Edit the specific Contact
-router.put('/timesheets/:id', function(req, res){
+        console.log(values);
 
-    var {timer, result} = initializeRoute(req);
-    var userID = req.user.id;
+        // Perform DB Query
+        db.reporting.multi(pool, userID, values, completedQuery, failedQuery);
 
-    log.info("Editing Contact")
-    console.log(req.params);
+        function completedQuery(qres){
+            // Package The Results Up
+            var packed = {
+                periodStart: cleaned.startDate,
+                periodEnd: cleaned.endDate,
+                reports: []
+            };
 
+            var ukey = {};
 
-    // json body of the request...
-    var clientRequest = req.body;
+            /* ukey = {
+                user_id : 
+                    recs: [
+                        {}
+                    ]
+                 }
+            */
+            // I Pray for the soul that should need to debug this
+            var mostRecentRecIndex;
+            qres.rows.forEach( (rep) => {
+                var uid = rep.user_id;
+                if(rep.clock_day != null){
+                    // This is a clock entry for this user
+                    var ttype = "clock";
+                    var tmpObj = {
+                        date: rep.clock_day,
+                        type: rep.clock_type,
+                        clockIn: rep.start_time,
+                        clockOut: rep.end_time,
+                        billableMins: rep.billable_minutes,
+                        breakTotalMins: rep.minutes_on_break,
+                        breaks: []
+                    };
+                    // Add The Key if it does not exist already
+                    if(_.has(ukey, uid)){
+                        var idex = ukey[uid].detail.push(tmpObj);
+                        mostRecentRecIndex = idex-1;
+                    }else{
+                        ukey[uid] = {
+                            meta: {
+                                userID: uid,
+                                fullName: rep.user_full_name,
+                                totals: {
+                                    work: 0,
+                                    pto: 0,
+                                    upto: 0,
+                                    admin: 0
+                                }
+                            },
+                            detail: []
+                        };
+                        var idex = ukey[uid].detail.push(tmpObj);
+                        mostRecentRecIndex = idex-1;
+                    }
+                    if(rep.clock_type == 'WORK'){
+                        if(rep.billable_minutes != null){
+                            ukey[uid].meta.totals.work = ukey[uid].meta.totals.work + rep.billable_minutes;
+                        }
+                    }else if(rep.clock_type == 'PTO'){
+                        if(rep.billable_minutes != null){
+                            ukey[uid].meta.totals.pto = ukey[uid].meta.totals.pto + rep.billable_minutes;
+                        }
+                    }else if(rep.clock_type == 'UPTO'){
+                        if(rep.billable_minutes != null){
+                            ukey[uid].meta.totals.upto = ukey[uid].meta.totals.upto + rep.billable_minutes;
+                        }
+                    }else{
+                        if(rep.billable_minutes != null){
+                            ukey[uid].meta.totals.admin = ukey[uid].meta.totals.admin + rep.billable_minutes;
+                        }
+                    }
+                    console.log(ukey[uid]); 
+                }else{
+                    // This is a break entry for this user
+                    var breakObj = {
+                        breakStart: rep.start_time,
+                        breakEnd: rep.end_time,
+                        breakMins: rep.minutes_on_break
+                    };
+                    ukey[uid].detail[mostRecentRecIndex].breaks.push(breakObj);
+                }
+            });
 
-    // Validation of Request id parameter before use
-    if ( !(_.has(req.params, "id")) || req.params.id == null || req.params.id == undefined){
+            console.log(ukey);
+            // Probably should have used .map here, but w/e
+            var ukeyKeys = _.keys(ukey);
+            ukeyKeys.forEach((k)=>{
+                packed.reports.push(ukey[k]);
+            });
+            result.setStatus(200);
+            result.setPayload(packed);
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
 
-        result.setStatus(400);
-        result.addError("Request Requires Parameter id to be filled");
-        result.setPayload({});
+        function failedQuery(failure){
+            console.log("Failure Called")
+            if(failure.error){
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+        }
+    }else{
+        // Can Go No Further Will Error Filled Garbage
         res.status(result.getStatus()).type('application/json').send(result.getPayload());
         timer.endTimer(result);
-        return;
     }
 });
 
+// Report For Date For ALL Users
+router.post('/report/all', function (req, res) {
 
-// Deletes the specific timesheet
-router.delete('/timesheets/:id', function(req, res){
-
+    // get timer and result builder
     var {timer, result} = initializeRoute(req);
+
+    log.info("Searching...")
+    console.log(req.params)
+
+    // get user id
     var userID = req.user.id;
 
-    if ( !(_.has(req.params, "id")) || req.params.id == null || req.params.id == undefined){
+    // get json body
+    var body = req.body;
 
+    // Body Expects
+    // startDate - FORMATTED YYYY-MM-DD
+    // endDate - FORMATTED YYYY-MM-DD
+
+    // Start Validation
+    var cleaned = {
+        startDate: null,
+        endDate: null
+    }
+    const correctDateFormat = /^\d{4}-(1|2|3|4|5|6|7|8|9|10|11|12|01|02|03|04|05|06|07|08|09)-\d{1,2}$/;
+    // Check Start Date
+    if(_.has(body, 'startDate')){
+        // Must Match Regex Definition of Formatted Date
+        if(correctDateFormat.test(body.startDate)){
+            cleaned.startDate = body.startDate;
+        }else{
+            result.setStatus(400);
+            result.addError("startDate Is Malformed - startDate Must Be Formatted As YYYY-MM-DD");
+        }
+    }else{
         result.setStatus(400);
-        result.addError("Request Requires Parameter id to be filled");
-        result.setPayload({});
+        result.addError("Request Missing Required Key - Body Must Contain startDate (Formatted As YYYY-MM-DD)");
+    }
+    // Check End Date
+    if(_.has(body, 'endDate')){
+        // Must Match Regex Definition of Formatted Date
+        if(correctDateFormat.test(body.endDate)){
+            cleaned.endDate = body.endDate;
+        }else{
+            console.log(body.endDate)
+            result.setStatus(400);
+            result.addError("endDate Is Malformed - endDate Must Be Formatted As YYYY-MM-DD");
+        }
+    }else{
+        result.setStatus(400);
+        result.addError("Request Missing Required Key - Body Must Contain endDate (Formatted As YYYY-MM-DD)");
+    }
+
+    // Check If Result Has Errors
+    if(!result.hasErrors()){
+        // Build Required Values Array
+        var values = [cleaned.startDate, cleaned.endDate];
+
+        // Perform DB Query
+        db.reporting.all(pool, userID, values, completedQuery, failedQuery);
+
+        function completedQuery(qres){
+            // Package The Results Up
+            var packed = {
+                periodStart: cleaned.startDate,
+                periodEnd: cleaned.endDate,
+                reports: []
+            };
+
+            var ukey = {};
+
+            /* ukey = {
+                user_id : 
+                    recs: [
+                        {}
+                    ]
+                 }
+            */
+            // I Pray for the soul that should need to debug this
+            var mostRecentRecIndex;
+            qres.rows.forEach( (rep) => {
+                var uid = rep.user_id;
+                if(rep.clock_day != null){
+                    // This is a clock entry for this user
+                    var ttype = "clock";
+                    var tmpObj = {
+                        date: rep.clock_day,
+                        type: rep.clock_type,
+                        clockIn: rep.start_time,
+                        clockOut: rep.end_time,
+                        billableMins: rep.billable_minutes,
+                        breakTotalMins: rep.minutes_on_break,
+                        breaks: []
+                    };
+                    // Add The Key if it does not exist already
+                    if(_.has(ukey, uid)){
+                        var idex = ukey[uid].detail.push(tmpObj);
+                        mostRecentRecIndex = idex-1;
+                    }else{
+                        ukey[uid] = {
+                            meta: {
+                                userID: uid,
+                                fullName: rep.user_full_name,
+                                totals: {
+                                    work: 0,
+                                    pto: 0,
+                                    upto: 0,
+                                    admin: 0
+                                }
+                            },
+                            detail: []
+                        };
+                        var idex = ukey[uid].detail.push(tmpObj);
+                        mostRecentRecIndex = idex-1;
+                    }
+                    if(rep.clock_type == 'WORK'){
+                        if(rep.billable_minutes != null){
+                            ukey[uid].meta.totals.work = ukey[uid].meta.totals.work + rep.billable_minutes;
+                        }
+                    }else if(rep.clock_type == 'PTO'){
+                        if(rep.billable_minutes != null){
+                            ukey[uid].meta.totals.pto = ukey[uid].meta.totals.pto + rep.billable_minutes;
+                        }
+                    }else if(rep.clock_type == 'UPTO'){
+                        if(rep.billable_minutes != null){
+                            ukey[uid].meta.totals.upto = ukey[uid].meta.totals.upto + rep.billable_minutes;
+                        }
+                    }else{
+                        if(rep.billable_minutes != null){
+                            ukey[uid].meta.totals.admin = ukey[uid].meta.totals.admin + rep.billable_minutes;
+                        }
+                    }
+                    console.log(ukey[uid]); 
+                }else{
+                    // This is a break entry for this user
+                    var breakObj = {
+                        breakStart: rep.start_time,
+                        breakEnd: rep.end_time,
+                        breakMins: rep.minutes_on_break
+                    };
+                    ukey[uid].detail[mostRecentRecIndex].breaks.push(breakObj);
+                }
+            });
+
+            console.log(ukey);
+            // Probably should have used .map here, but w/e
+            var ukeyKeys = _.keys(ukey);
+            ukeyKeys.forEach((k)=>{
+                packed.reports.push(ukey[k]);
+            });
+            result.setStatus(200);
+            result.setPayload(packed);
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+
+        function failedQuery(failure){
+            console.log("Failure Called")
+            if(failure.error){
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+        }
+    }else{
+        // Can Go No Further Will Error Filled Garbage
         res.status(result.getStatus()).type('application/json').send(result.getPayload());
         timer.endTimer(result);
-        return;
     }
-    var paramID = req.params.id;
 });
+
+// timestamps always in format: YYYY-MM-DD HH24:MM:SS
+// Date always in format: YYYY-MM-DD
+// Times will be returned as HH12:MM AM/PM
+/*
+var report_response_format = {
+    period_start: 'period start timestamp',
+    period_end: 'period end timestamp',
+    reports:[ // 0 or more
+        { 
+            meta: {
+                userID: 'id',
+                fullName: 'full_name',
+                totals: {
+                    work: #ofmins,
+                    pto: #ofmins,
+                    upto: #ofmins,
+                    admin: #ofmins
+                }
+            },
+            detail: [ // 0 or more
+                {
+                    date: 'detail item date',
+					type: 'WORK / PTO / UPTO / ADMIN',
+                    clockIn: 'clock in time',
+                    clockOut: 'clock out time',
+                    billableMins: '# of billable minutes',
+                    breakTotalMins: '# of break minutes',
+                    breaks: [ // 0 or more
+                        {
+                            breakStart: 'break start time',
+                            breakEnd: 'break end time',
+                            breakMins: 'length of break in minutes'
+                        }
+                    ]
+
+                }
+            ]
+        }   
+        
+    ]
+}
+*/
+
+// // Get all timesheets
+// router.get('/timesheets', function (req, res) {
+//     // Get Timer and Result Builder
+//     var {timer, result} = initializeRoute(req);
+
+//     var userID = req.user.id;
+
+//     var page = 0;
+//     var perPage = 24;
+
+//     if(_.has(req.query, 'perpage')){
+//         perPage = parseInt(req.query.perpage);
+//     }
+
+//     if(_.has(req.query, 'page')){
+//         page = parseInt(req.query.page);
+//     }
+
+//     var meta = {};
+    
+// });
+
+
+// // Searching through Timesheets
+// router.post('/timesheets/search', function (req, res) {
+
+//     // get timer and result builder
+//     var {timer, result} = initializeRoute(req);
+
+//     log.info("Searching...")
+//     console.log(req.params)
+
+//     // get user id
+//     var userID = req.user.id;
+
+//     // get json body
+//     var body = req.body;
+
+// });
+
+// // Get Single Timesheet
+// router.get('/timesheets/:id', function (req, res) {
+//     // Get Timer and Result Builder
+//     var {timer, result} = initializeRoute(req);
+
+//     var userID = req.user.id;
+
+//     // Validation of Request id parameter before use
+//     if ( !(_.has(req.params, "id")) || req.params.id == null || req.params.id == undefined){
+
+//         result.setStatus(400);
+//         result.addError("Request Requires Parameter id to be filled");
+//         result.setPayload({});
+//         res.status(result.getStatus()).type('application/json').send(result.getPayload());
+//         timer.endTimer(result);
+//         return;
+//     }
+
+// });
+
+// // Edit the specific Contact
+// router.put('/timesheets/:id', function(req, res){
+
+//     var {timer, result} = initializeRoute(req);
+//     var userID = req.user.id;
+
+//     log.info("Editing Contact")
+//     console.log(req.params);
+
+
+//     // json body of the request...
+//     var clientRequest = req.body;
+
+//     // Validation of Request id parameter before use
+//     if ( !(_.has(req.params, "id")) || req.params.id == null || req.params.id == undefined){
+
+//         result.setStatus(400);
+//         result.addError("Request Requires Parameter id to be filled");
+//         result.setPayload({});
+//         res.status(result.getStatus()).type('application/json').send(result.getPayload());
+//         timer.endTimer(result);
+//         return;
+//     }
+// });
+
+
+// // Deletes the specific timesheet
+// router.delete('/timesheets/:id', function(req, res){
+
+//     var {timer, result} = initializeRoute(req);
+//     var userID = req.user.id;
+
+//     if ( !(_.has(req.params, "id")) || req.params.id == null || req.params.id == undefined){
+
+//         result.setStatus(400);
+//         result.addError("Request Requires Parameter id to be filled");
+//         result.setPayload({});
+//         res.status(result.getStatus()).type('application/json').send(result.getPayload());
+//         timer.endTimer(result);
+//         return;
+//     }
+//     var paramID = req.params.id;
+// });
 
 
 // Actual Endpoints - END
