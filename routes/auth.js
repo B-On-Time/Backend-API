@@ -229,10 +229,228 @@ router.get('/logout', function(req, res){
 
 })
 
+// Get User ID and User Name From Kiosk Mode - Requires Auth
+router.post('/kiosk/login', authVerification, function (req, res) {
+    // Get Timer and Result Builder
+    var {timer, result} = initializeRoute(req);
+    // Basic Validation
+    if( !('pin' in req.body) ){ 
+        result.addError("MALFORMED REQUEST: Request Must Contain pin");
+        result.setStatus(400); 
+    }
+
+    // TODO: Permissions Check On Current User To Check If User Is Kiosk Mode
+
+    // TODO: Validate Pin as Numeric 8 Digits Long
+
+    if( !result.hasErrors() ){
+        var values = [req.body.pin];
+            
+        db.auth.getKioskPinLogin(pool, values, successCallback, failureCallback);
+
+        function successCallback(qres){
+            //console.log(qres);
+            //log.debug("Fetch User Returns: " + qres.rowCount);
+            if(qres.rowCount == 0){
+                // No Match Found For User ID
+                result.setStatus(403);
+                result.addError("Invalid PIN Code")
+                result.addError("Invalid PIN Code - Detail: No User Found For Given PIN Code")
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else if(qres.rowCount == 1){
+                var userRow = qres.rows[0];
+                
+
+                var payload = {
+                    userID: userRow.user_id,
+                    firstName: userRow.first_name,
+                    middleName: userRow.middle_name,
+                    lastName: userRow.last_name
+                };
+                result.setStatus(200);
+                result.setPayload(payload);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+
+            }else{ 
+                // More Than One User Matches The User Name Entered
+                result.setStatus(403);
+                result.addError("Pin Invalid - PIN Overlaps With Another PIN - Regenerate PIN Code")
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+        }
+    
+        function failureCallback(failure){
+            console.log("DB Query Failed")
+            if(failure.error){
+                console.log(failure.error.name);
+                //console.log(failure.error.message);
+                if(failure.error.constraint == 'unq_users_email_and_username')
+                    console.log("User Already Exists");
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                if(failure.result == "USERNAME ALREADY EXISTS"){
+                    result.setStatus(403);
+                    result.addError("Username Already Exists");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+            }
+        }
+
+    }else{
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+});
+
+// Get User ID and User Name From Kiosk Mode - Requires Auth
+router.post('/kiosk/setpin', authVerification, function (req, res) {
+    // Get Timer and Result Builder
+    var {timer, result} = initializeRoute(req);
+    // Basic Validation
+    if( !('userID' in req.body) ){ 
+        result.addError("MALFORMED REQUEST: Request Must Contain userID To Setup Kiosk PIN For");
+        result.setStatus(400); 
+    }
+    // get user id from Cookie
+    var userID = req.user.id;
+
+    // TODO: Validate The User Requested For Pin Set Actually Exists
+
+    // TODO: Permissions Check On Current User To Check If User Is Admin Of User Attempting To Set
+
+    if( !result.hasErrors() ){
+        var values = [req.body.userID];
+            
+        db.auth.setupKioskPin(pool, userID, values, successCallback, failureCallback);
+
+        function successCallback(qres){
+            //console.log(qres);
+            //log.debug("Fetch User Returns: " + qres.rowCount);
+            if(qres.rowCount == 0){
+                // Ran Out Of Attempts
+                result.setStatus(503);
+                result.addError("Unable To Generate PIN Code - Retry")
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                var userRow = qres.rows[0];
+                
+                var payload = {
+                    pin: userRow.upsert_kiosk_pin
+                };
+                result.setStatus(200);
+                result.setPayload(payload);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+
+            }
+        }
+    
+        function failureCallback(failure){
+            console.log("DB Query Failed")
+            if(failure.error){
+                console.log(failure.error.name);
+                //console.log(failure.error.message);
+                if(failure.error.constraint == 'unq_users_email_and_username')
+                    console.log("User Already Exists");
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                if(failure.result == "USERNAME ALREADY EXISTS"){
+                    result.setStatus(403);
+                    result.addError("Username Already Exists");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+            }
+        }
+
+    }else{
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+});
+
 // Check Auth
 router.get('/check', authVerification, function (req, res) {
     // Get Timer and Result Builder
     var {timer, result} = initializeRoute(req);
+    // Basic Validation
+    result.setStatus(200);
+    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+    timer.endTimer(result);
+
+    
+});
+
+// get auth/verify/:verificationID - Verifies Email
+router.get('/verify/:verificationID', function (req, res) {
+    // Get Timer and Result Builder
+    var {timer, result} = initializeRoute(req);
+
+    var verID = req.params.verificationID
+
+    // There is nothing in the body for this request, it is a get request
+    function completedQuery(qres){
+        // TODO: Validate That Row Exists
+        if(qres.rowCount == 0){
+            // Failed To Verify Email
+            result.setStatus(404);
+            result.addError("Unable To Verify Email")
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            if(qres.rows[0].verify_email){
+                result.setStatus(204);
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                result.setStatus(404);
+                result.addError("Unable To Verify Email")
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result); 
+            }
+            
+        }
+    }
+
+    function failedQuery(failure){
+        console.log("Failure Called")
+        if(failure.error){
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }else{
+            console.log(failure.result)
+            result.setStatus(500);
+            result.addError("An Error Has Occured E100");
+            res.status(result.getStatus()).type('application/json').send(result.getPayload());
+            timer.endTimer(result);
+        }
+    }
+
     // Basic Validation
     result.setStatus(200);
     res.status(result.getStatus()).type('application/json').send(result.getPayload());
@@ -330,130 +548,125 @@ router.get('/check', authVerification, function (req, res) {
 // });
 
 
-// router.post('/apikey', function (req, res) {
-//     // Get Timer and Result Builder
-//     var {timer, result} = initializeRoute(req);
-//     // Basic Validation
-//     if( !('username' in req.body) ){ 
-//         result.addError("MALFORMED REQUEST: Request Must Contain username");
-//         result.setStatus(400);
-//     }else{
-//         if( !validator.isEmail(req.body.username) ){
-//             result.addError("MALFORMED REQUEST: Username Must Be A Valid Email");
-//             result.setStatus(400);
-//         }
-//     }
-//     if( !('password' in req.body) ){ 
-//         result.addError("MALFORMED REQUEST: Request Must Contain password");
-//         result.setStatus(400); 
-//     }
+router.post('/apikey', function (req, res) {
+    // Get Timer and Result Builder
+    var {timer, result} = initializeRoute(req);
+    // Basic Validation
+    if( !('username' in req.body) ){ 
+        result.addError("MALFORMED REQUEST: Request Must Contain username");
+        result.setStatus(400);
+    }
+    if( !('password' in req.body) ){ 
+        result.addError("MALFORMED REQUEST: Request Must Contain password");
+        result.setStatus(400); 
+    }
 
-//     if( !result.hasErrors() ){
-//         var values = [req.body.username];
+    if( !result.hasErrors() ){
+        var values = [req.body.username];
             
-//         db.auth.getLogin(pool, values, successCallback, failureCallback);
+        db.auth.getLogin(pool, values, successCallback, failureCallback);
 
-//         function successCallback(qres){
-//             //console.log(qres);
-//             //log.debug("Fetch User Returns: " + qres.rowCount);
-//             if(qres.rowCount == 0){
-//                 // No Match Found For User ID
-//                 result.setStatus(403);
-//                 result.addError("User Not Found")
-//                 result.addError("User Not Found - Detail: User may not exist, or may be disabled")
-//                 res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//                 timer.endTimer(result);
-//             }else if(qres.rowCount == 1){
-//                 var userRow = qres.rows[0];
+        function successCallback(qres){
+            //console.log(qres);
+            //log.debug("Fetch User Returns: " + qres.rowCount);
+            if(qres.rowCount == 0){
+                // No Match Found For User ID
+                result.setStatus(403);
+                result.addError("User Not Found")
+                result.addError("User Not Found - Detail: User may not exist, or may be disabled")
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else if(qres.rowCount == 1){
+                var userRow = qres.rows[0];
                 
-//                 bcrypt.compare(req.body.password, userRow.hash, (err, bres) => {
-//                     arguments.callee.displayName = "post-login-user";
-//                     if(err){
-//                         //Error
-//                         console.log(err);
-//                     }else if(bres){
-//                         //Matches, create JWT, Set Cookies, and Return
-//                         // JWT is Good For One Day, Cookie Is Good For One Day
-//                         var jwtOpts = {
-//                             expiresIn: 86400,
-//                             issuer: "COP4331API",
-//                             audience: ["localhost"],
-//                             algorithm: 'RS256'
-//                         };
-//                         var jwtPayload = {
-//                             user_id: userRow.id,
-//                             first_name: userRow.first_name, 
-//                             last_name: userRow.last_name
-//                         };
-//                         //TODO: Placeholder To Be Replaced With Actual Config Information
-//                         var userAcctConfig = {
+                bcrypt.compare(req.body.password, userRow.pass, (err, bres) => {
+                    arguments.callee.displayName = "post-login-user";
+                    if(err){
+                        //Error
+                        console.log(err);
+                    }else if(bres){
+                        //Matches, create JWT, Set Cookies, and Return
+                        // JWT is Good For One Day, Cookie Is Good For One Day
+                        var jwtOpts = {
+                            expiresIn: 86400,
+                            issuer: "COP4331API",
+                            audience: ["localhost"],
+                            algorithm: 'RS256'
+                        };
+                        var jwtPayload = {
+                            user_id: userRow.id,
+                            first_name: userRow.first_name, 
+                            last_name: userRow.last_name
+                        };
+                        //TODO: Placeholder To Be Replaced With Actual Config Information
+                        var userAcctConfig = {
 
-//                         };
-//                         var insecureSessionMgmtToken = (1000 * 60 * 60 * 24) + Date.now();
-//                         jwt.sign(jwtPayload, config.jwtprivate, jwtOpts, function(err, token){
-//                             if(err){
-//                                 console.log(err);
-//                                 result.setStatus(500);
-//                                 result.addError("Error Durring JWT Creation")
-//                                 res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//                                 timer.endTimer(result);
-//                             }else{
-//                                 result.setStatus(200);
-//                                 result.setPayload({apikey: token});
-//                                 res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//                                 timer.endTimer(result);
-//                             }
+                        };
+                        var insecureSessionMgmtToken = (1000 * 60 * 60 * 24) + Date.now();
+                        jwt.sign(jwtPayload, config.jwtprivate, jwtOpts, function(err, token){
+                            if(err){
+                                console.log(err);
+                                result.setStatus(500);
+                                result.addError("Error Durring JWT Creation")
+                                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                                timer.endTimer(result);
+                            }else{
+                                result.setStatus(200);
+                                result.setPayload({apikey: token});
+                                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                                timer.endTimer(result);
+                            }
                             
-//                         });
-//                     }else{
-//                         //Does Not Match
-//                         result.setStatus(401);
-//                         result.addError("Authentication Failed")
-//                         res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//                         timer.endTimer(result);
-//                     }
-//                 });
-//             }else{ 
-//                 // More Than One User Matches The User Name Entered
-//                 result.setStatus(403);
-//                 result.addError("User Invalid")
-//                 res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//                 timer.endTimer(result);
-//             }
-//         }
+                        });
+                    }else{
+                        //Does Not Match
+                        result.setStatus(401);
+                        result.addError("Authentication Failed")
+                        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                        timer.endTimer(result);
+                    }
+                });
+            }else{ 
+                // More Than One User Matches The User Name Entered
+                result.setStatus(403);
+                result.addError("User Invalid")
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }
+        }
     
-//         function failureCallback(failure){
-//             console.log("DB Query Failed")
-//             if(failure.error){
-//                 console.log(failure.error.name);
-//                 //console.log(failure.error.message);
-//                 if(failure.error.constraint == 'unq_users_email_and_username')
-//                     console.log("User Already Exists");
-//                 result.setStatus(500);
-//                 result.addError("An Error Has Occured E100");
-//                 res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//                 timer.endTimer(result);
-//             }else{
-//                 console.log(failure.result)
-//                 if(failure.result == "USERNAME ALREADY EXISTS"){
-//                     result.setStatus(403);
-//                     result.addError("Username Already Exists");
-//                     res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//                     timer.endTimer(result);
-//                 }else{
-//                     result.setStatus(500);
-//                     result.addError("An Error Has Occured E100");
-//                     res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//                     timer.endTimer(result);
-//                 }
-//             }
-//         }
+        function failureCallback(failure){
+            console.log("DB Query Failed")
+            if(failure.error){
+                console.log(failure.error.name);
+                //console.log(failure.error.message);
+                if(failure.error.constraint == 'unq_users_email_and_username')
+                    console.log("User Already Exists");
+                result.setStatus(500);
+                result.addError("An Error Has Occured E100");
+                res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                timer.endTimer(result);
+            }else{
+                console.log(failure.result)
+                if(failure.result == "USERNAME ALREADY EXISTS"){
+                    result.setStatus(403);
+                    result.addError("Username Already Exists");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }else{
+                    result.setStatus(500);
+                    result.addError("An Error Has Occured E100");
+                    res.status(result.getStatus()).type('application/json').send(result.getPayload());
+                    timer.endTimer(result);
+                }
+            }
+        }
 
-//     }else{
-//         res.status(result.getStatus()).type('application/json').send(result.getPayload());
-//         timer.endTimer(result);
-//     }
-// });
+    }else{
+        res.status(result.getStatus()).type('application/json').send(result.getPayload());
+        timer.endTimer(result);
+    }
+});
 
 
 // Actual Endpoints - END
