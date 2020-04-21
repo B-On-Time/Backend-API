@@ -1,0 +1,10 @@
+{
+    "data": {
+        "host": "127.0.0.1",
+        "database": "bontime",
+        "user": "bontime_rest_api_data_user",
+        "password": "todo-generate-secure-password",
+        "port": 5433,
+        "max": 20
+    }
+  }
