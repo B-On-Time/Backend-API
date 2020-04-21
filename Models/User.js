@@ -15,19 +15,8 @@ module.exports = User;
  * @swagger
  *  components:
  *    schemas:
-<<<<<<< Updated upstream
- *      User:
- *        type: object
- *        required:
- *          - userId
- *          - eventDate
- *          - entryTime
- *          - punchType
- *          - notes
-=======
  *      Employee:
  *        type: object
->>>>>>> Stashed changes
  *        properties:
  *          userId:
  *            type: string
@@ -43,17 +32,6 @@ module.exports = User;
  *            description: Type of clock in performed
  *                WORK, PTO, UPTO, ADMIN
  *          notes:
-<<<<<<< Updated upstream
- *              type: string
- *              description: Notes for the day
- *
- *        example:
- *           "userId": "000000"
- *           "eventDate": "00/00/0000"
- *           "entryTime": "00:00"
- *           "punchType": "ADMIN"
- *           "notes": "NOTES TO REMEMBER"
-=======
  *             type: string
  *             description: Notes for the day
  *
@@ -95,5 +73,4 @@ module.exports = User;
  *           "password": "12buck"
  *           "notes": "Yes, no, maybe"
  *
->>>>>>> Stashed changes
  */

@@ -4,11 +4,7 @@ const express = require("express");
 const router = express.Router();
 const swaggerJsdoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
-<<<<<<< Updated upstream
-
-=======
 const _ = require('underscore');
->>>>>>> Stashed changes
 
 // App Modules
 const User = require("../Models/User");
@@ -33,38 +29,23 @@ const User = require("../Models/User");
  *        content:
  *          application/json:
  *            schema:
-<<<<<<< Updated upstream
- *              $ref: '#/components/schemas/User'
-=======
  *              $ref: '#/components/schemas/Employee'
->>>>>>> Stashed changes
  *      responses:
  *        "200":
  *          description: A user schema
  *          content:
  *            application/json:
  *              schema:
-<<<<<<< Updated upstream
- *                $ref: '#/components/schemas/User'
- *        "404":
- *          description: User cannot be found.
- *        "403":
- *          description: User cannot clock in, Already clocked in.
-=======
  *                $ref: '#/components/schemas/Employee'
  *        "404":
  *          description: Employee cannot be found.
  *        "403":
  *          description: Employee cannot clock in, Already clocked in.
->>>>>>> Stashed changes
  *          content:
  *           application/json:
  *            schema:
  *              type: object
  *              properties:
-<<<<<<< Updated upstream
- *                  userId: "53924"
-=======
  *                userId:
  *                 type: string
  *                 description: Employees identification number
@@ -82,7 +63,6 @@ const User = require("../Models/User");
  *                 type: string
  *                 description: Notes for the day
  *
->>>>>>> Stashed changes
  *        "500":
  *          description: An Error has occured E100
  *
@@ -115,19 +95,11 @@ const User = require("../Models/User");
   *          content:
   *            application/json:
   *              schema:
-<<<<<<< Updated upstream
-  *                $ref: '#/components/schemas/User'
-  *        "404":
-  *          description: User cannot be found.
-  *        "403":
-  *          description: User cannot clock in, Already clocked in.
-=======
   *                $ref: '#/components/schemas/Employee'
   *        "404":
   *          description: Employee cannot be found.
   *        "403":
   *          description: Employee cannot clock in, Already clocked in.
->>>>>>> Stashed changes
   *        "500":
   *          description: An Error has occured E100
   */
@@ -156,19 +128,11 @@ const User = require("../Models/User");
    *          content:
    *            application/json:
    *              schema:
-<<<<<<< Updated upstream
-   *                $ref: '#/components/schemas/User'
-   *        "404":
-   *          description: User cannot be found.
-   *        "403":
-   *          description: User cannot clock in, Already clocked in.
-=======
    *                $ref: '#/components/schemas/Employee'
    *        "404":
    *          description: Employee cannot be found.
    *        "403":
    *          description: Employee cannot clock in, Already clocked in.
->>>>>>> Stashed changes
    *          content:
    *           application/json:
    *            schema:
@@ -197,10 +161,6 @@ const User = require("../Models/User");
  *                userId:
  *                  type: string
  *                  description: Identification number of the user
-<<<<<<< Updated upstream
- *                  example: "312458"
-
-=======
  *                  example: "f0496731-8bfd-48ce-a765-2818cda5a25b"
  *                eventDate:
  *                  type: string
@@ -218,7 +178,6 @@ const User = require("../Models/User");
  *                  type: string
  *                  description: notes for the day
  *                  example: "Take cat out of the fridge. When I'm done with mah break."
->>>>>>> Stashed changes
  *
  *      responses:
  *        "200":
@@ -233,11 +192,7 @@ const User = require("../Models/User");
  *                  description: Identification number of the user
  *                  example: "87457"
  *        "404":
-<<<<<<< Updated upstream
- *          description: User cannot be found.
-=======
  *          description: Employee cannot be found.
->>>>>>> Stashed changes
  *        "403":
  *          description: make sure you're clocked in and not on break
  *        "500":
@@ -257,36 +212,21 @@ const User = require("../Models/User");
   *        content:
   *          application/json:
   *            schema:
-<<<<<<< Updated upstream
-  *              $ref: '#/components/schemas/User'
-=======
   *              $ref: '#/components/schemas/Employee'
->>>>>>> Stashed changes
   *      responses:
   *        "200":
   *          description: A user schema
   *          content:
   *            application/json:
   *              schema:
-<<<<<<< Updated upstream
-  *                $ref: '#/components/schemas/User'
-  *        "403":
-  *          description: User cannot clock out, Already clocked in.
-=======
   *                $ref: '#/components/schemas/Employee'
   *        "403":
   *          description: Employee cannot clock out, Already clocked in.
->>>>>>> Stashed changes
   *          content:
   *           application/json:
   *            schema:
   *              type: object
   *              properties:
-<<<<<<< Updated upstream
-  *                  userId: "53924"
-  *        "404":
-  *          description: User cannot be found.
-=======
   *                userId:
   *                 type: String
   *                 description: already clocked in!
@@ -294,15 +234,12 @@ const User = require("../Models/User");
   *
   *        "404":
   *          description: Employee cannot be found.
->>>>>>> Stashed changes
   *        "500":
   *          description: An Error has occured E100
   *
   */
 
  /**
-<<<<<<< Updated upstream
-=======
   * @swagger
   * path:
   *  /report/all:
@@ -433,7 +370,6 @@ const User = require("../Models/User");
 
 
  /**
->>>>>>> Stashed changes
  * @swagger
  * path:
  *  /timesheets:
@@ -451,11 +387,8 @@ const User = require("../Models/User");
  *                 type:[]
  *
  */
-<<<<<<< Updated upstream
-=======
 
 
->>>>>>> Stashed changes
  /**
  * @swagger
  * path:
@@ -469,11 +402,7 @@ const User = require("../Models/User");
  *           description: Get timesheet of user
  *           schema:
  *             type: string
-<<<<<<< Updated upstream
- *             example: "0928234"
-=======
  *             example: "12345"
->>>>>>> Stashed changes
  *             description: enter id number of user
  *      responses:
  *        "200":
@@ -481,24 +410,13 @@ const User = require("../Models/User");
  *          content:
  *            application/json:
  *              schema:
-<<<<<<< Updated upstream
- *                $ref: '#/components/schemas/User'
-=======
  *                $ref: '#/components/schemas/Employee'
->>>>>>> Stashed changes
  *        "400":
  *           description: Request Requires Parameter id to be filled
  *        "500":
  *           description: Internal Server Error
  *        "404":
-<<<<<<< Updated upstream
- *           description: User does not exist!
- *
- *
- *
-=======
  *           description: Employee does not exist!
->>>>>>> Stashed changes
  */
 
  // /**
@@ -520,18 +438,6 @@ const User = require("../Models/User");
  // *          content:
  // *            application/json:
  // *              schema:
-<<<<<<< Updated upstream
- // *                $ref: '#/components/schemas/User'
- // */
-
-
-router.post("/clock/in/", (req, res, next) => {
-  const { userId, eventDate, entryTime, punchType } = req.body;
-  const user = new User(userId, eventDate, entryTime, punchType );
-  res.json(user);
-});
-
-=======
  // *                $ref: '#/components/schemas/Employee'
  // */
 
@@ -546,15 +452,12 @@ router.post("/clock/in/", (req, res, next) => {
 
 
 
->>>>>>> Stashed changes
 router.post("/clock/out/", (req, res, next) => {
   const { userId, eventDate, entryTime, punchType } = req.body;
   const user = new User(userId, eventDate, entryTime, punchType );
   res.json(user);
 });
 
-<<<<<<< Updated upstream
-=======
 router.post("/user", (req, res, next) => {
   const { userId, eventDate, entryTime, punchType } = req.body;
   const user = new User(userId, eventDate, entryTime, punchType );
@@ -570,7 +473,6 @@ router.post("/user", (req, res, next) => {
 });
 });
 
->>>>>>> Stashed changes
 router.post("/break/start/", (req, res, next) => {
   const { userId, eventDate, entryTime, punchType } = req.body;
   const user = new User(userId, eventDate, entryTime, punchType );
@@ -617,8 +519,6 @@ router.get("/timesheets/:user", (req, res, next) => {
 });
 
 
-<<<<<<< Updated upstream
-=======
 router.get("/report/{user}", (req, res, next) => {
 
   var report_response_format = {
@@ -665,7 +565,6 @@ router.get("/report/{user}", (req, res, next) => {
 });
 
 
->>>>>>> Stashed changes
 // Swagger set up
 const options = {
   swaggerDefinition: {
@@ -681,10 +580,6 @@ const options = {
       {
         url: "http://localhost:5433/"
       }
-<<<<<<< Updated upstream
-    ]
-  },
-=======
     ],
 
     components:{
@@ -694,7 +589,6 @@ const options = {
     }}
 
   }},
->>>>>>> Stashed changes
   apis: ["./Models/User.js", "./Routes/index.js"]
 };
 const specs = swaggerJsdoc(options);
