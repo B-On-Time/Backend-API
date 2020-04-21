@@ -70,7 +70,38 @@ GRANT USAGE ON TYPES TO "bontime_rest_api_data_user";
 
 Then Switch To A Connection To PostgreSQL from the user `bontime_rest_api_data_user` with the password provided in the script.
 
+Create a gmail account and fill the information a config file named email.json and place it into the config folder
+```json
+{
+    "email": "example@gmail.com",
+    "password": "example-pass"
+}
+```
 
+Fill Your Domain Information Into a config file named domain.json and place it into the config folder
+```json
+{
+    "web":"website fqdn",
+    "api":"api fqdn"
+}
+```
+Note: These can be the same FQDN
+
+Create A Folder Called Keys In The Config Folder.
+
+Generate RSA 4096 Keys
+`jwt-a`
+`jwt-rsa`
+
+Rename the jwt-a public and private keys to
+private key: `jwt-private-key-unencrypted.pem`
+public key: `jwt-public-key.pub`
+
+Rename the jwt-a public and private keys to
+private key: `jwt-rsa.public`
+public key: `jwt-rsa.public`
+
+place the renamed files into the config/keys folder
 
 Then Run This Script
 
@@ -79,6 +110,7 @@ Then Run This Script
 
 -- TODO: Somehow SETUP Email Account
 -- Also Require User Sets Up https://myaccount.google.com/lesssecureapps allow less secure apps
+
 
 
 
@@ -209,6 +241,7 @@ CREATE TABLE public.auth
 	expires double precision DEFAULT extract(epoch from (now() + interval '24 hours') at time zone 'utc'),
 	pass text,
 	api_key text,
+	kiosk_pin bigint,
     PRIMARY KEY (id)
 );
 
