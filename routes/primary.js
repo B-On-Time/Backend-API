@@ -1286,7 +1286,8 @@ router.get('/user/:id', function (req, res) {
 
     // There is nothing in the body for this request, it is a get request
 
-    var values = [userId];
+
+    var values = [req.params.userId];
     db.user.view(pool, userID, values, completedQuery, failedQuery);
 
     function completedQuery(qres){
