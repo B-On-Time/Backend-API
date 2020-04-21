@@ -15,6 +15,7 @@ module.exports = User;
  * @swagger
  *  components:
  *    schemas:
+<<<<<<< Updated upstream
  *      User:
  *        type: object
  *        required:
@@ -23,6 +24,10 @@ module.exports = User;
  *          - entryTime
  *          - punchType
  *          - notes
+=======
+ *      Employee:
+ *        type: object
+>>>>>>> Stashed changes
  *        properties:
  *          userId:
  *            type: string
@@ -38,6 +43,7 @@ module.exports = User;
  *            description: Type of clock in performed
  *                WORK, PTO, UPTO, ADMIN
  *          notes:
+<<<<<<< Updated upstream
  *              type: string
  *              description: Notes for the day
  *
@@ -47,4 +53,47 @@ module.exports = User;
  *           "entryTime": "00:00"
  *           "punchType": "ADMIN"
  *           "notes": "NOTES TO REMEMBER"
+=======
+ *             type: string
+ *             description: Notes for the day
+ *
+ *        example:
+ *           "userId": "09771"
+ *           "eventDate": "01/12/2021"
+ *           "entryTime": "00:00"
+ *           "punchType": "ADMIN"
+ *           "notes": "Mary had a little lamb"
+
+ *      User:
+ *        type: object
+ *        required:
+ *          - firstName
+ *          - lastName
+ *          - email
+ *          - password
+ *        properties:
+ *          firstName:
+ *            type: string
+ *            description: Users first name
+ *          lastName:
+ *            type: string
+ *            description: Users last name
+ *          email:
+ *            type: string
+ *            description: Users e-mail address
+ *          password:
+ *            type: string
+ *            description: Password of user
+ *          notes:
+ *             type: string
+ *             description: Notes for the day
+ *
+ *        example:
+ *           "firstName": "Peter"
+ *           "lastName": "Pan"
+ *           "email": "peterpan@thepanning.com"
+ *           "password": "12buck"
+ *           "notes": "Yes, no, maybe"
+ *
+>>>>>>> Stashed changes
  */
