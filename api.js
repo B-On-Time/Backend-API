@@ -16,6 +16,7 @@ const log = require('./libraries/logging.js');
 //Routes
 var primary = require('./routes/primary.js');
 var auth = require('./routes/auth.js');
+var docs = require('./routes/index.js');
 var actions = require('./routes/pages.js');
 const db = require('./libraries/dbqueries.js');
 // Hard Coded Configs
@@ -214,6 +215,9 @@ app.use('/auth', auth);
 
 // Served Pages
 app.use('/actions', actions);
+
+// Serve Swagger Docs
+app.use('/swagger', docs);
 
 // Primary Route
 app.use('/', primary);
